@@ -4,7 +4,12 @@ from pathlib import Path
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from app.schemas import PackageClaims, RegistryRecord, VerificationResult
+from app.schemas import (
+    PackageClaims,
+    RegistryRecord,
+    SafetyAlertRecord,
+    VerificationResult,
+)
 from app.verifier import verify_package
 
 
@@ -28,6 +33,9 @@ REGISTRY_RECORDS = [
 ]
 
 ALERT_RECORDS = ALERT_DATA["records"]
+VALIDATED_ALERT_RECORDS = [
+    SafetyAlertRecord(**record) for record in ALERT_RECORDS
+]
 
 
 app = FastAPI(
@@ -48,6 +56,10 @@ class RegistryMetadata(BaseModel):
     dataset_label: str
     record_count: int
     source_note: str
+
+
+class AlertRecordsResponse(BaseModel):
+    records: list[SafetyAlertRecord]
 
 
 class AlertMetadata(BaseModel):
@@ -105,8 +117,14 @@ def list_alert_records():
 
 @app.post("/api/v1/verify", response_model=VerificationResult)
 def verify(request: VerifyRequest):
-    return verify_package(
+    result = verify_package(
         request.claims,
         REGISTRY_RECORDS,
         alert_records=ALERT_RECORDS,
+    )
+    return result.model_copy(
+        update={
+            "registry_snapshot_retrieved_at": REGISTRY_DATA["retrieved_at"],
+            "alerts_snapshot_retrieved_at": ALERT_DATA["retrieved_at"],
+        }
     )
