@@ -46,6 +46,20 @@ class FieldCheck(BaseModel):
         "package_vs_registry",
         "registry_record_only",
     ] = "package_vs_registry"
+
+
+class SafetyAlertEvidence(BaseModel):
+    """A relevant safety alert; not proof about an individual package."""
+
+    alert_id: str
+    title: str
+    product_name: str
+    source_name: str
+    source_url: str
+    published_at: str | None = None
+    alert_scope: str | None = None
+    explanation: str
+
 class VerificationResult(BaseModel):
     """Evidence-based outcome; not a declaration of authenticity."""
 
@@ -57,6 +71,7 @@ class VerificationResult(BaseModel):
     summary: str
     matched_record: bool
     checks: list[FieldCheck] = Field(default_factory=list)
+    safety_alerts: list[SafetyAlertEvidence] = Field(default_factory=list)
     source_name: str | None = None
     source_url: str | None = None
     dataset_label: str | None = None

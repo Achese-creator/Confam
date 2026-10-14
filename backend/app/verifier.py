@@ -7,6 +7,7 @@ from app.schemas import (
     FieldCheck,
     PackageClaims,
     RegistryRecord,
+     SafetyAlertEvidence,
     VerificationResult,
 )
 
@@ -157,12 +158,76 @@ def check_expiry(
     )
 
 
+def find_relevant_alerts(
+    claims: PackageClaims,
+    alert_records: list[dict],
+) -> list[SafetyAlertEvidence]:
+    """Find alerts supported by a product-name match plus another identifier."""
+    relevant_alerts = []
+
+    package_name = normalize(claims.product_name)
+    package_number = normalize_registration_number(claims.nafdac_reg_number)
+    package_batch = normalize(claims.batch_number)
+
+    if not package_name:
+        return relevant_alerts
+
+    for alert in alert_records:
+        alert_name = normalize(alert.get("product_name"))
+        alert_number = normalize_registration_number(
+            alert.get("reported_registration_number")
+        )
+        alert_batch = normalize(alert.get("batch_number"))
+
+        name_matches = (
+            bool(alert_name)
+            and ratio(package_name, alert_name) >= 85
+        )
+        number_matches = (
+            bool(package_number)
+            and bool(alert_number)
+            and package_number == alert_number
+        )
+        batch_matches = (
+            bool(package_batch)
+            and bool(alert_batch)
+            and package_batch == alert_batch
+        )
+
+        if name_matches and (number_matches or batch_matches):
+            relevant_alerts.append(
+                SafetyAlertEvidence(
+                    alert_id=alert["alert_id"],
+                    title=alert["title"],
+                    product_name=alert["product_name"],
+                    source_name=alert["source_name"],
+                    source_url=alert["source_url"],
+                    published_at=alert.get("published_at"),
+                    alert_scope=alert.get("alert_scope"),
+                    explanation=(
+                        "The package product name and at least one additional "
+                        "identifier match this safety-alert record. This is "
+                        "evidence requiring review, not proof that this "
+                        "individual package is affected."
+                    ),
+                )
+            )
+
+    return relevant_alerts
+
+
 def verify_package(
     claims: PackageClaims,
     registry_records: list[RegistryRecord],
     today: date | None = None,
+    alert_records: list[dict] | None = None,
 ) -> VerificationResult:
     """Compare package claims against local records; never certify authenticity."""
+
+    safety_alerts = find_relevant_alerts(
+        claims,
+        alert_records or [],
+    )
 
     supplied_number = normalize_registration_number(
         claims.nafdac_reg_number
@@ -170,13 +235,26 @@ def verify_package(
 
     if not supplied_number:
         return VerificationResult(
-            status="verification_concern_detected",
+            status=(
+                "high_risk_discrepancy_detected"
+                if safety_alerts
+                else "verification_concern_detected"
+            ),
             summary=(
-                "No registration number was available to search. "
-                "The product could not be checked against the registry."
+                "A relevant safety alert matches the supplied product "
+                "information. Seek professional or regulatory verification."
+                if safety_alerts
+                else (
+                    "No registration number was available to search. "
+                    "The product could not be checked against the registry."
+                )
             ),
             matched_record=False,
-            limitations=["A registration number was not provided."],
+            safety_alerts=safety_alerts,
+            limitations=[
+                "A safety-alert match is not proof that this individual package is affected.",
+                "A registration number was not provided.",
+            ],
         )
 
     reference = next(
@@ -191,15 +269,26 @@ def verify_package(
 
     if reference is None:
         return VerificationResult(
-            status="verification_concern_detected",
+            status=(
+                "high_risk_discrepancy_detected"
+                if safety_alerts
+                else "verification_concern_detected"
+            ),
             summary=(
-                "No matching registration number was found in the local dataset. "
-                "This is not proof of counterfeiting."
+                "A relevant safety alert matches the supplied product "
+                "information. Seek professional or regulatory verification."
+                if safety_alerts
+                else (
+                    "No matching registration number was found in the local dataset. "
+                    "This is not proof of counterfeiting."
+                )
             ),
             matched_record=False,
+            safety_alerts=safety_alerts,
             limitations=[
                 "The local dataset may be incomplete or outdated.",
-                "A missing record is not proof of counterfeiting.",
+                "A safety-alert match is not proof that this individual package is affected.",
+                "A missing registry record is not proof of counterfeiting.",
             ],
         )
 
@@ -285,6 +374,14 @@ def verify_package(
                 "regulatory verification."
             )
 
+    if safety_alerts:
+        status = "high_risk_discrepancy_detected"
+        summary = (
+            "A relevant safety alert matches the supplied product information. "
+            "Review the alert and seek professional or regulatory verification. "
+            "This does not establish that the individual package is affected."
+        )
+
     limitations = [
         "A registration-number match does not prove package authenticity.",
         "The local snapshot may be incomplete or outdated.",
@@ -297,6 +394,7 @@ def verify_package(
         summary=summary,
         matched_record=True,
         checks=checks,
+        safety_alerts=safety_alerts,
         source_name=reference.source_name,
         source_url=reference.source_url,
         dataset_label=reference.dataset_label,

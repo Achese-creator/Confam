@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -5,34 +7,37 @@ from pydantic import BaseModel
 from app.schemas import PackageClaims, RegistryRecord, VerificationResult
 from app.verifier import verify_package
 
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+
+def load_json(filename: str) -> dict:
+    path = DATA_DIR / filename
+
+    with path.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+# Load curated datasets from version-controlled JSON snapshots.
+REGISTRY_DATA = load_json("registry.json")
+ALERT_DATA = load_json("alerts.json")
+
+REGISTRY_RECORDS = [
+    RegistryRecord(**record)
+    for record in REGISTRY_DATA["records"]
+]
+
+ALERT_RECORDS = ALERT_DATA["records"]
+
+
 app = FastAPI(
     title="CONFAM API",
     description=(
         "AI-assisted medicine-package and regulatory evidence checker. "
         "Results identify discrepancies; they do not certify authenticity."
     ),
-    version="0.1.0",
+    version="0.2.0",
 )
-
-
-# Temporary development fixtures only.
-# These are NOT real NAFDAC records.
-SAMPLE_REGISTRY: list[RegistryRecord] = [
-    RegistryRecord(
-        product_name="Example Paracetamol Tablets",
-        active_ingredients="Paracetamol",
-        strength="500 mg",
-        dosage_form="Tablet",
-        nafdac_reg_number="SYNTHETIC-TEST-001",
-        manufacturer="Example Manufacturer Ltd",
-        registration_status="Registered",
-        registration_expiry_date="2030-12-31",
-        source_name="CONFAM synthetic development fixture",
-        source_url="https://example.invalid/synthetic-fixture",
-        retrieved_at="2026-10-14",
-        dataset_label="synthetic_test_fixture",
-    )
-]
 
 
 class VerifyRequest(BaseModel):
@@ -45,6 +50,12 @@ class RegistryMetadata(BaseModel):
     source_note: str
 
 
+class AlertMetadata(BaseModel):
+    dataset_name: str
+    record_count: int
+    source_note: str
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "confam-api"}
@@ -52,16 +63,50 @@ def health_check():
 
 @app.get("/api/v1/registry", response_model=RegistryMetadata)
 def registry_metadata():
+    labels = {record.dataset_label for record in REGISTRY_RECORDS}
+
+    dataset_label = (
+        next(iter(labels))
+        if len(labels) == 1
+        else "mixed_sources"
+    )
+
     return RegistryMetadata(
-        dataset_label="synthetic_test_fixture",
-        record_count=len(SAMPLE_REGISTRY),
+        dataset_label=dataset_label,
+        record_count=len(REGISTRY_RECORDS),
         source_note=(
-            "Development-only synthetic data. "
-            "No records in this dataset represent verified NAFDAC products."
+            f"Versioned snapshot retrieved on "
+            f"{REGISTRY_DATA['retrieved_at']}. "
+            "The dataset may be incomplete or outdated. "
+            "A matching record does not prove package authenticity."
         ),
     )
 
 
+@app.get("/api/v1/alerts", response_model=AlertMetadata)
+def alert_metadata():
+    return AlertMetadata(
+        dataset_name=ALERT_DATA["dataset_name"],
+        record_count=len(ALERT_RECORDS),
+        source_note=(
+            f"Curated safety-alert snapshot retrieved on "
+            f"{ALERT_DATA['retrieved_at']}. "
+            "Each alert applies only within its stated scope; "
+            "an alert is not a universal verdict on every package "
+            "with a matching product name."
+        ),
+    )
+
+
+@app.get("/api/v1/alerts/records")
+def list_alert_records():
+    return {"records": ALERT_RECORDS}
+
+
 @app.post("/api/v1/verify", response_model=VerificationResult)
 def verify(request: VerifyRequest):
-    return verify_package(request.claims, SAMPLE_REGISTRY)
+    return verify_package(
+        request.claims,
+        REGISTRY_RECORDS,
+        alert_records=ALERT_RECORDS,
+    )
