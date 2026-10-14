@@ -1,0 +1,30 @@
+{
+  "dataset_name": "CONFAM curated medicine safety alerts",
+  "schema_version": "1.0",
+  "retrieved_at": "2026-10-14",
+  "records": [
+    {
+      "alert_id": "NAFDAC-PUBLIC-ALERT-037-2025",
+      "alert_number": "37/2025",
+      "title": "Alert on the Report of Substandard and Falsified BETACLOX Found in Nigeria",
+      "product_name": "BETACLOX",
+      "product_ingredients": "Ampicillin and Cloxacillin",
+      "product_strength": "Ampicillin 250 mg and Cloxacillin 250 mg",
+      "reported_registration_number": "A4-4724",
+      "reference_product_name": "Mebendazole",
+      "reference_product_strength": "500 mg",
+      "reference_manufacturer": "Chi Ltd",
+      "batch_number": "230701",
+      "manufacturing_date": "07/2023",
+      "expiry_date": "07/2026",
+      "alert_scope": "Nigeria",
+      "risk_classification": "suspected_substandard_and_falsified",
+      "source_name": "NAFDAC",
+      "source_url": "https://nafdac.gov.ng/public-alert-no-37-2025-alert-on-the-report-of-substandard-and-falsified-sf-betaclox-found-in-nigeria/",
+      "published_at": "2025-11-04",
+      "retrieved_at": "2026-10-14",
+      "dataset_label": "curated_source_record",
+      "curation_note": "The alert reports that the registration number displayed on the suspected BETACLOX product belongs to a different product. Preserve the alert's wording and scope; do not generalize this finding to every package bearing the BETACLOX name."
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "dataset_name": "CONFAM curated medicine registry snapshot",
+  "schema_version": "1.0",
+  "retrieved_at": "2026-10-14",
+  "sources": [
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/02"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/17"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/18"
+    }
+  ],
+  "records": [
+    {
+      "product_name": "AG Spironolactone",
+      "active_ingredients": "Spironolactone",
+      "strength": "25 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A4-100160",
+      "manufacturer": "Alpa Laboratories Pvt Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2026-12-16",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/02",
+      "retrieved_at": "2026-10-14",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Agazit Tablets",
+      "active_ingredients": "Azithromycin (Azithromycin Dihydrate)",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A4-100147",
+      "manufacturer": "Alpa Laboratories Pvt Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2026-12-01",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/17",
+      "retrieved_at": "2026-10-14",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Agcef Tablet",
+      "active_ingredients": "Cefuroxime (Cefuroxime Axetil)",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A4-100138",
+      "manufacturer": "Alpa Laboratories Pvt Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2026-12-01",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/18",
+      "retrieved_at": "2026-10-14",
+      "dataset_label": "curated_source_record"
+    }
+  ]
+}
