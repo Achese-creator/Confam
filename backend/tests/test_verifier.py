@@ -114,3 +114,12 @@ def test_expired_registration_requires_attention():
         if check.field == "registration_expiry_date"
     )
     assert expiry_check.outcome == "mismatch"
+    expiry_check = next(
+        check
+        for check in result.checks
+        if check.field == "registration_expiry_date"
+    )
+    assert expiry_check.check_scope == "registry_record_only"
+    assert expiry_check.package_value is None
+
+

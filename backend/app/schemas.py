@@ -38,12 +38,14 @@ class FieldCheck(BaseModel):
     """An auditable comparison between a claim and reference evidence."""
 
     field: str
-    package_value: str | None
-    reference_value: str | None
+    package_value: str | None = None
+    reference_value: str | None = None
     outcome: Literal["match", "mismatch", "not_checked"]
     explanation: str
-
-
+    check_scope: Literal[
+        "package_vs_registry",
+        "registry_record_only",
+    ] = "package_vs_registry"
 class VerificationResult(BaseModel):
     """Evidence-based outcome; not a declaration of authenticity."""
 

@@ -120,6 +120,7 @@ def check_expiry(
             package_value=None,
             reference_value=None,
             outcome="not_checked",
+            check_scope="registry_record_only",
             explanation="The reference record has no registration expiry date.",
         )
 
@@ -131,6 +132,7 @@ def check_expiry(
             package_value=None,
             reference_value=value,
             outcome="not_checked",
+            check_scope="registry_record_only",
             explanation="The reference expiry date could not be parsed.",
         )
 
@@ -141,6 +143,7 @@ def check_expiry(
             package_value=None,
             reference_value=value,
             outcome="mismatch",
+            check_scope="registry_record_only",
             explanation="The recorded registration expiry date has passed.",
         )
 
