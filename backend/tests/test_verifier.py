@@ -98,6 +98,7 @@ def test_missing_fields_require_review():
     assert result.status == "verification_concern_detected"
 
 
+
 def test_expired_registration_requires_attention():
     record = sample_record(registration_expiry_date="2025-12-31")
 
@@ -114,12 +115,24 @@ def test_expired_registration_requires_attention():
         if check.field == "registration_expiry_date"
     )
     assert expiry_check.outcome == "mismatch"
+    assert expiry_check.check_scope == "registry_record_only"
+    assert expiry_check.package_value is None
+
+
+def test_valid_registration_expiry_uses_registry_only_scope():
+    record = sample_record(registration_expiry_date="2030-12-31")
+
+    result = verify_package(
+        matching_claims(),
+        [record],
+        today=date(2026, 10, 14),
+    )
+
     expiry_check = next(
         check
         for check in result.checks
         if check.field == "registration_expiry_date"
     )
+    assert expiry_check.outcome == "match"
     assert expiry_check.check_scope == "registry_record_only"
     assert expiry_check.package_value is None
-
-

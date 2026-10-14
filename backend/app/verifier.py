@@ -152,6 +152,7 @@ def check_expiry(
         package_value=None,
         reference_value=value,
         outcome="match",
+        check_scope="registry_record_only",
         explanation="The recorded registration expiry date has not passed.",
     )
 
