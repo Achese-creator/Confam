@@ -191,3 +191,186 @@ def test_missing_registration_status_is_not_checked():
     assert status_check.outcome == "not_checked"
     assert status_check.reference_value is None
     assert status_check.check_scope == "registry_record_only"
+
+def test_registration_number_formatting_differences_still_match():
+    result = verify_package(
+        matching_claims(nafdac_reg_number=" A1 / 1234 "),
+        [sample_record(nafdac_reg_number="A1-1234")],
+        today=date(2026, 10, 14),
+    )
+
+    assert result.matched_record is True
+    assert result.status == "no_significant_discrepancy_detected"
+
+
+def test_duplicate_normalized_registration_numbers_require_review():
+    first_record = sample_record()
+    second_record = sample_record(
+        nafdac_reg_number="A1 1234",
+        product_name="Different Medicine",
+        active_ingredients="Different Ingredient",
+    )
+
+    result = verify_package(
+        matching_claims(),
+        [first_record, second_record],
+        today=date(2026, 10, 14),
+    )
+
+    assert result.matched_record is False
+    assert result.status == "verification_concern_detected"
+    assert "ambiguous" in result.summary.lower()
+    assert result.checks == []
+    assert result.source_url is None
+    assert any(
+        "duplicate normalized registration numbers" in item.lower()
+        for item in result.limitations
+    )
+
+
+def test_duplicate_registration_numbers_do_not_hide_a_matching_alert():
+    from app.verifier import verify_package
+
+    alert = {
+        "alert_id": "TEST-ALERT-1",
+        "title": "Test safety alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "BATCH-7",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    result = verify_package(
+        matching_claims(batch_number="BATCH-7"),
+        [
+            sample_record(),
+            sample_record(nafdac_reg_number="A1 1234"),
+        ],
+        today=date(2026, 10, 14),
+        alert_records=[alert],
+    )
+
+    assert result.matched_record is False
+    assert result.status == "high_risk_discrepancy_detected"
+    assert len(result.safety_alerts) == 1
+
+def test_alert_matches_exact_product_and_registration_number():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-ALERT-2",
+        "title": "Test alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "OTHER-BATCH",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        matching_claims(),
+        [alert],
+    )
+
+    assert len(matches) == 1
+    assert matches[0].alert_id == "TEST-ALERT-2"
+
+
+def test_alert_matches_exact_product_and_batch_number():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-ALERT-3",
+        "title": "Test alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "DIFFERENT-NUMBER",
+        "batch_number": "BATCH-7",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        matching_claims(batch_number="BATCH-7"),
+        [alert],
+    )
+
+    assert len(matches) == 1
+    assert matches[0].alert_id == "TEST-ALERT-3"
+
+
+def test_alert_does_not_match_on_registration_number_alone():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-ALERT-4",
+        "title": "Test alert",
+        "product_name": "Completely Different Medicine",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "UNRELATED-BATCH",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        matching_claims(),
+        [alert],
+    )
+
+    assert matches == []
+
+
+def test_alert_does_not_match_when_package_product_name_is_missing():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-ALERT-5",
+        "title": "Test alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "BATCH-7",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        PackageClaims(
+            nafdac_reg_number="A1-1234",
+            batch_number="BATCH-7",
+        ),
+        [alert],
+    )
+
+    assert matches == []
+
+def test_unrecognized_registration_status_requires_review_not_high_risk():
+    result = verify_package(
+        matching_claims(),
+        [sample_record(registration_status="Under Administrative Review")],
+        today=date(2026, 10, 14),
+    )
+
+    status_check = next(
+        check for check in result.checks
+        if check.field == "registration_status"
+    )
+    assert status_check.outcome == "not_checked"
+    assert status_check.check_scope == "registry_record_only"
+    assert result.status == "verification_concern_detected"
+    assert "unrecognized status" in status_check.explanation.lower()
+
+
+def test_revoked_registration_status_requires_high_risk_review():
+    result = verify_package(
+        matching_claims(),
+        [sample_record(registration_status="Revoked")],
+        today=date(2026, 10, 14),
+    )
+
+    status_check = next(
+        check for check in result.checks
+        if check.field == "registration_status"
+    )
+    assert status_check.outcome == "mismatch"
+    assert result.status == "high_risk_discrepancy_detected"
+

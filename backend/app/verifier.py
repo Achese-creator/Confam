@@ -124,17 +124,32 @@ def check_registration_status(reference: RegistryRecord) -> FieldCheck:
         )
 
     status_text = normalize(value)
+
     if status_text in {"registered", "active", "valid"}:
         outcome = "match"
         explanation = (
             "The registry record reports an active/valid registration status. "
             "This is registry-only information and does not prove package authenticity."
         )
-    else:
+    elif status_text in {
+        "suspended",
+        "revoked",
+        "cancelled",
+        "withdrawn",
+        "inactive",
+        "expired",
+        "deregistered",
+    }:
         outcome = "mismatch"
         explanation = (
-            "The registry record reports a status requiring attention. "
+            "The registry record reports a known inactive or adverse status. "
             "Check the cited source and seek professional or regulatory verification."
+        )
+    else:
+        outcome = "not_checked"
+        explanation = (
+            "The registry record contains an unrecognized status value. "
+            "Its meaning cannot be safely inferred; verify it against the cited source."
         )
 
     return FieldCheck(
@@ -299,15 +314,34 @@ def verify_package(
             ],
         )
 
-    reference = next(
-        (
-            record
-            for record in registry_records
-            if normalize_registration_number(record.nafdac_reg_number)
-            == supplied_number
-        ),
-        None,
-    )
+    matching_records = [
+        record
+        for record in registry_records
+        if normalize_registration_number(record.nafdac_reg_number)
+        == supplied_number
+    ]
+
+    if len(matching_records) > 1:
+        return VerificationResult(
+            status=(
+                "high_risk_discrepancy_detected"
+                if safety_alerts
+                else "verification_concern_detected"
+            ),
+            summary=(
+                "Multiple registry records share this normalized registration "
+                "number. The reference is ambiguous and needs manual review."
+            ),
+            matched_record=False,
+            safety_alerts=safety_alerts,
+            limitations=[
+                "The local dataset contains duplicate normalized registration numbers.",
+                "No single registry record was selected because the evidence is ambiguous.",
+                "A safety-alert match is not proof that this individual package is affected.",
+            ],
+        )
+
+    reference = matching_records[0] if matching_records else None
 
     if reference is None:
         return VerificationResult(
@@ -392,10 +426,18 @@ def verify_package(
             "and the record associated with this registration number. "
             "Seek professional or regulatory verification."
         )
-    elif mismatches or any(
-        check.outcome == "not_checked"
-        and check.check_scope != "registry_record_only"
-        for check in checks
+    elif (
+        mismatches
+        or any(
+            check.outcome == "not_checked"
+            and check.check_scope != "registry_record_only"
+            for check in checks
+        )
+        or any(
+            check.field == "registration_status"
+            and check.outcome == "not_checked"
+            for check in checks
+        )
     ):
         status = "verification_concern_detected"
         summary = (
@@ -411,12 +453,20 @@ def verify_package(
 
     if reference.registration_status:
         status_text = normalize(reference.registration_status)
-        if status_text not in {"registered", "active", "valid"}:
+        if status_text in {
+            "suspended",
+            "revoked",
+            "cancelled",
+            "withdrawn",
+            "inactive",
+            "expired",
+            "deregistered",
+        }:
             status = "high_risk_discrepancy_detected"
             summary = (
-                "The reference record has a registration status that requires "
-                "attention. Check the cited source and seek professional or "
-                "regulatory verification."
+                "The reference record reports a known inactive or adverse "
+                "registration status. Check the cited source and seek "
+                "professional or regulatory verification."
             )
 
     if safety_alerts:
