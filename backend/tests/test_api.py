@@ -78,7 +78,7 @@ def test_alert_metadata_reports_curated_snapshot():
     assert response.status_code == 200
     data = response.json()
 
-    assert data["record_count"] == 2
+    assert data["record_count"] == 5
     assert "scope" in data["source_note"].lower()
 
 
@@ -195,3 +195,90 @@ def test_api_zacef_different_batch_does_not_escalate_from_alert_alone():
     assert alert["alert_id"] == "NAFDAC-PUBLIC-ALERT-009-2024"
     assert alert["batch_match_status"] == "different"
     assert "does not establish" in alert["explanation"].lower()
+
+
+def test_api_cialis_exact_reported_batch_triggers_high_risk():
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "Cialis Tadalafil tablets 20mg",
+                "nafdac_reg_number": "4464",
+                "batch_number": "E3242401",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "high_risk_discrepancy_detected"
+    assert any(
+        alert["alert_id"] == "NAFDAC-PUBLIC-ALERT-033-2025"
+        and alert["batch_match_status"] == "match"
+        for alert in result["safety_alerts"]
+    )
+
+
+def test_api_amoxivue_exact_reported_batch_triggers_high_risk():
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "Amoxivue",
+                "nafdac_reg_number": "A4-100178",
+                "batch_number": "322584",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "high_risk_discrepancy_detected"
+    assert any(
+        alert["alert_id"] == "NAFDAC-PUBLIC-ALERT-024-2025"
+        and alert["batch_match_status"] == "match"
+        for alert in result["safety_alerts"]
+    )
+
+
+def test_api_amoxivue_different_batch_does_not_escalate_from_alert_alone():
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "Amoxivue",
+                "nafdac_reg_number": "A4-100178",
+                "batch_number": "UNRELATED-BATCH-999",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "verification_concern_detected"
+    assert any(
+        alert["alert_id"] == "NAFDAC-PUBLIC-ALERT-024-2025"
+        and alert["batch_match_status"] == "different"
+        for alert in result["safety_alerts"]
+    )
+
+
+def test_api_sporidex_exact_recalled_batch_triggers_high_risk():
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "Sporidex Suspension",
+                "batch_number": "DFG4606A",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "high_risk_discrepancy_detected"
+    assert any(
+        alert["alert_id"] == "NAFDAC-PUBLIC-ALERT-033-2026"
+        and alert["batch_match_status"] == "match"
+        for alert in result["safety_alerts"]
+    )

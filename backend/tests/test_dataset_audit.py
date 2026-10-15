@@ -22,7 +22,7 @@ def test_audit_reports_current_snapshot_counts_and_validation():
     )
 
     assert report["datasets"]["registry"]["record_count"] == len(read_snapshot("registry.json")["records"])
-    assert report["datasets"]["alerts"]["record_count"] == 2
+    assert report["datasets"]["alerts"]["record_count"] == 5
     assert report["datasets"]["registry"]["validation_passed"] is True
     assert report["datasets"]["alerts"]["validation_passed"] is True
 
