@@ -30,7 +30,7 @@ def alert_snapshot() -> dict:
 def test_current_registry_snapshot_passes_integrity_checks():
     records = validate_registry_snapshot(registry_snapshot())
 
-    assert len(records) == 6
+    assert len(records) == len(registry_snapshot()["records"])
     assert all(record.source_url.startswith("https://") for record in records)
 
 

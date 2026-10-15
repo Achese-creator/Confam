@@ -26,6 +26,38 @@
     {
       "name": "NAFDAC Greenbook",
       "url": "https://greenbook.nafdac.gov.ng/products/details/885"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/6023"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/5065"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/11079"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/7858"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/10906"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/4952"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/9983"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/4714"
     }
   ],
   "records": [
@@ -110,6 +142,118 @@
       "registration_expiry_date": "2028-12-20",
       "source_name": "NAFDAC Greenbook",
       "source_url": "https://greenbook.nafdac.gov.ng/products/details/885",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Truvada Tablets (check pack size)",
+      "active_ingredients": "Emtricitabine; Tenofovir Disoproxil Fumarate",
+      "strength": "200 mg; 300 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "04-8774",
+      "manufacturer": "Takeda GmbH",
+      "registration_status": "Active",
+      "registration_expiry_date": "2028-05-24",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/6023",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "G-Fed Tablets",
+      "active_ingredients": "Pseudoephedrine Hydrochloride; Triprolidine",
+      "strength": "60 mg; 2.5 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A4-1070",
+      "manufacturer": "Osaka Pharmaceuticals Pvt. Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2028-07-05",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/5065",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Danacid Tablets",
+      "active_ingredients": "Aluminium hydroxide; Magnesium trisilicate",
+      "strength": "120 mg; 250 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "04-1068",
+      "manufacturer": "Dana Pharmaceuticals Limited",
+      "registration_status": "Active",
+      "registration_expiry_date": "2027-10-26",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/11079",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Back-Up Tablet",
+      "active_ingredients": "Levonorgestrel",
+      "strength": "1.5 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "B4-9214",
+      "manufacturer": "ACME Formulation Pvt. Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2029-07-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/7858",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Pyridox Tablets",
+      "active_ingredients": "Sulfadoxine; Pyrimethamine",
+      "strength": "500 mg; 25 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A11-100736",
+      "manufacturer": "Shalina Healthcare Nigeria Limited",
+      "registration_status": "Active",
+      "registration_expiry_date": "2029-07-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/10906",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "HCQS Tablets 200 mg",
+      "active_ingredients": "Hydroxychloroquine",
+      "strength": "200 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "04-7590",
+      "manufacturer": "IPCA Laboratories Ltd.",
+      "registration_status": "Active",
+      "registration_expiry_date": "2028-02-22",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/4952",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Parakris-500",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A4-5653",
+      "manufacturer": "Krishat Pharma Industries Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2027-04-27",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/9983",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Atenolol-100 Tablet",
+      "active_ingredients": "Atenolol",
+      "strength": "100 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "B4-8161",
+      "manufacturer": "Alpa Laboratories Pvt Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2028-05-24",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/4714",
       "retrieved_at": "2026-10-15",
       "dataset_label": "curated_source_record"
     }

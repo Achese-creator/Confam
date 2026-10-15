@@ -31,7 +31,7 @@ def test_valid_registry_candidate_can_be_loaded(tmp_path):
 
     result = load_and_validate_candidate("registry", candidate)
 
-    assert result["record_count"] == 6
+    assert result["record_count"] == len(read_snapshot("registry.json")["records"])
     assert result["snapshot_retrieved_at"] == "2026-10-15"
 
 
@@ -78,7 +78,7 @@ def test_apply_replaces_destination_only_after_validation(tmp_path):
 
     promoted = json.loads(existing.read_text(encoding="utf-8"))
     assert result["applied"] is True
-    assert len(promoted["records"]) == 6
+    assert len(promoted["records"]) == len(read_snapshot("registry.json")["records"])
     assert promoted["dataset_name"] == "CONFAM curated medicine registry snapshot"
 
 

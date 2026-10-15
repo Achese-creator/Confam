@@ -19,7 +19,13 @@ def test_registry_metadata_reports_curated_records():
     data = response.json()
 
     assert data["dataset_label"] == "curated_source_record"
-    assert data["record_count"] == 6
+    from pathlib import Path
+    import json
+
+    snapshot = json.loads(
+        Path("data/registry.json").read_text(encoding="utf-8")
+    )
+    assert data["record_count"] == len(snapshot["records"])
     assert "snapshot" in data["source_note"].lower()
 
 
