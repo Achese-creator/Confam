@@ -11,6 +11,10 @@ from app.schemas import (
     VerificationResult,
 )
 from app.verifier import verify_package
+from app.dataset_validation import (
+    validate_alert_snapshot,
+    validate_registry_snapshot,
+)
 
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -27,14 +31,12 @@ def load_json(filename: str) -> dict:
 REGISTRY_DATA = load_json("registry.json")
 ALERT_DATA = load_json("alerts.json")
 
-REGISTRY_RECORDS = [
-    RegistryRecord(**record)
-    for record in REGISTRY_DATA["records"]
-]
+REGISTRY_RECORDS = validate_registry_snapshot(REGISTRY_DATA)
+VALIDATED_ALERT_RECORDS = validate_alert_snapshot(ALERT_DATA)
 
-ALERT_RECORDS = ALERT_DATA["records"]
-VALIDATED_ALERT_RECORDS = [
-    SafetyAlertRecord(**record) for record in ALERT_RECORDS
+# Keep the existing API response shape while using validated alert records.
+ALERT_RECORDS = [
+    record.model_dump() for record in VALIDATED_ALERT_RECORDS
 ]
 
 
