@@ -133,6 +133,10 @@ def test_valid_registration_expiry_uses_registry_only_scope():
         for check in result.checks
         if check.field == "registration_expiry_date"
     )
-    assert expiry_check.outcome == "match"
+    assert expiry_check.outcome == "not_checked"
     assert expiry_check.check_scope == "registry_record_only"
     assert expiry_check.package_value is None
+    assert expiry_check.reference_value == "2030-12-31"
+    assert "no package-label comparison was performed" in (
+        expiry_check.explanation
+    )

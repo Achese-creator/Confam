@@ -152,9 +152,13 @@ def check_expiry(
         field="registration_expiry_date",
         package_value=None,
         reference_value=value,
-        outcome="match",
+        outcome="not_checked",
         check_scope="registry_record_only",
-        explanation="The recorded registration expiry date has not passed.",
+        explanation=(
+            "The registry record lists this registration expiry date as "
+            "not yet passed. This is registry-only information; no "
+            "package-label comparison was performed."
+        ),
     )
 
 
@@ -350,7 +354,9 @@ def verify_package(
             "Seek professional or regulatory verification."
         )
     elif mismatches or any(
-        check.outcome == "not_checked" for check in checks
+        check.outcome == "not_checked"
+        and check.check_scope != "registry_record_only"
+        for check in checks
     ):
         status = "verification_concern_detected"
         summary = (
