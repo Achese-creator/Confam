@@ -30,14 +30,14 @@ def alert_snapshot() -> dict:
 def test_current_registry_snapshot_passes_integrity_checks():
     records = validate_registry_snapshot(registry_snapshot())
 
-    assert len(records) == 3
+    assert len(records) == 6
     assert all(record.source_url.startswith("https://") for record in records)
 
 
 def test_current_alert_snapshot_passes_integrity_checks():
     records = validate_alert_snapshot(alert_snapshot())
 
-    assert len(records) == 1
+    assert len(records) == 2
     assert records[0].alert_id == "NAFDAC-PUBLIC-ALERT-037-2025"
 
 
@@ -79,7 +79,7 @@ def test_registry_rejects_undeclared_record_source():
 
 def test_registry_rejects_record_retrieved_after_snapshot_date():
     snapshot = registry_snapshot()
-    snapshot["records"][0]["retrieved_at"] = "2026-10-15"
+    snapshot["records"][0]["retrieved_at"] = "2026-10-16"
 
     with pytest.raises(ValueError, match="later than the snapshot"):
         validate_registry_snapshot(snapshot)

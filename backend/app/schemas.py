@@ -84,6 +84,10 @@ class SafetyAlertEvidence(BaseModel):
     source_url: str
     published_at: str | None = None
     alert_scope: str | None = None
+    batch_expiry_date: str | None = None
+    batch_expiry_status: Literal[
+        "expired", "not_expired", "unknown"
+    ] = "unknown"
     explanation: str
 
 

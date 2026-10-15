@@ -1,7 +1,7 @@
 {
   "dataset_name": "CONFAM curated medicine safety alerts",
   "schema_version": "1.0",
-  "retrieved_at": "2026-10-14",
+  "retrieved_at": "2026-10-15",
   "records": [
     {
       "alert_id": "NAFDAC-PUBLIC-ALERT-037-2025",
@@ -25,6 +25,29 @@
       "retrieved_at": "2026-10-14",
       "dataset_label": "curated_source_record",
       "curation_note": "The alert reports that the registration number displayed on the suspected BETACLOX product belongs to a different product. Preserve the alert's wording and scope; do not generalize this finding to every package bearing the BETACLOX name."
+    },
+    {
+      "alert_id": "NAFDAC-PUBLIC-ALERT-009-2024",
+      "alert_number": "09/2024",
+      "title": "Alert on the Sale of Unregistered ZACEF-TZ Injection in Circulation in Nigeria",
+      "product_name": "ZACEF-TZ Injection",
+      "product_ingredients": "Ceftriaxone Sodium and Tazobactam Sodium",
+      "product_strength": null,
+      "reported_registration_number": "A-46344",
+      "reference_product_name": "EXACEF-TZ Injection",
+      "reference_product_strength": null,
+      "reference_manufacturer": null,
+      "batch_number": "C-2308-02A",
+      "manufacturing_date": "08/2023",
+      "expiry_date": "07/2025",
+      "alert_scope": "Nigeria; product discovered in FCT, Abuja",
+      "risk_classification": "unregistered_suspected_substandard_and_falsified",
+      "source_name": "NAFDAC",
+      "source_url": "https://nafdac.gov.ng/public-alert-no-09-2024-alert-on-the-sale-of-unregistered-zacef-tz-injection-in-circulation-in-nigeria/",
+      "published_at": "2024-02-08",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record",
+      "curation_note": "NAFDAC reports that the stated registration number A-46344 does not exist in its database. The alert also reports missing manufacturer details and patient information leaflet. Do not infer that other products with similar names or ingredients are affected. The alert concerns a specific reported product and batch."
     }
   ]
 }

@@ -32,6 +32,8 @@ type VerificationAlert = {
   source_url: string;
   published_at: string | null;
   alert_scope: string | null;
+  batch_expiry_date: string | null;
+  batch_expiry_status: "expired" | "not_expired" | "unknown";
   explanation: string;
 };
 
@@ -100,6 +102,42 @@ type SafetyAlert = {
   dataset_label: string;
   curation_note: string;
 };
+
+function getBatchExpiryStatus(value: string | null): "expired" | "not_expired" | "unknown" {
+  if (!value) return "unknown";
+
+  let year: number;
+  let month: number;
+  let day: number;
+
+  const monthYear = /^(\d{2})\/(\d{4})$/.exec(value);
+  const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+  if (monthYear) {
+    month = Number(monthYear[1]);
+    year = Number(monthYear[2]);
+    day = new Date(year, month, 0).getDate();
+  } else if (isoDate) {
+    year = Number(isoDate[1]);
+    month = Number(isoDate[2]);
+    day = Number(isoDate[3]);
+  } else {
+    return "unknown";
+  }
+
+  const expiry = new Date(year, month - 1, day);
+  if (
+    expiry.getFullYear() !== year ||
+    expiry.getMonth() !== month - 1 ||
+    expiry.getDate() !== day
+  ) {
+    return "unknown";
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return expiry < today ? "expired" : "not_expired";
+}
 
 function App() {
   const [view, setView] = useState<View>("overview");
@@ -527,6 +565,19 @@ function App() {
                         <p>{alert.explanation}</p>
                         {alert.published_at && <p>Published: {alert.published_at}</p>}
                         {alert.alert_scope && <p>Scope: {alert.alert_scope}</p>}
+                        {alert.batch_expiry_date && (
+                          <p>
+                            Reported batch expiry: {alert.batch_expiry_date} ·{" "}
+                            {alert.batch_expiry_status === "expired"
+                              ? "Historical batch — expiry has passed"
+                              : alert.batch_expiry_status === "not_expired"
+                                ? "Reported batch expiry has not passed"
+                                : "Batch expiry status unknown"}
+                          </p>
+                        )}
+                        {!alert.batch_expiry_date && (
+                          <p>Batch expiry status unknown; the original notice remains the source of context.</p>
+                        )}
                         <a href={alert.source_url} target="_blank" rel="noreferrer">
                           Read original {alert.source_name} notice ↗
                         </a>
@@ -650,6 +701,14 @@ function App() {
                         {alert.product_strength
                           ? ` · ${alert.product_strength}`
                           : ""}
+                      </p>
+
+                      <p className="alert-batch-status">
+                        {getBatchExpiryStatus(alert.expiry_date) === "expired"
+                          ? "Reported batch: expiry has passed"
+                          : getBatchExpiryStatus(alert.expiry_date) === "not_expired"
+                            ? "Reported batch: expiry has not passed"
+                            : "Reported batch: expiry status unknown"}
                       </p>
 
                       <dl className="alert-facts">

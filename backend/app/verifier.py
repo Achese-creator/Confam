@@ -1,4 +1,5 @@
 import re
+from calendar import monthrange
 from datetime import date
 
 from rapidfuzz.fuzz import ratio
@@ -215,9 +216,38 @@ def check_expiry(
     )
 
 
+def classify_alert_batch_expiry(
+    value: str | None,
+    today: date | None = None,
+) -> str:
+    """Classify the reported batch expiry without judging the alert's validity.
+
+    Accept ISO dates (YYYY-MM-DD) and month/year values (MM/YYYY).
+    Month/year expiry is treated as valid through the final day of that month.
+    """
+    if not value:
+        return "unknown"
+
+    current_date = today or date.today()
+
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            expiry = date.fromisoformat(value)
+        elif re.fullmatch(r"\d{2}/\d{4}", value):
+            month, year = map(int, value.split("/"))
+            expiry = date(year, month, monthrange(year, month)[1])
+        else:
+            return "unknown"
+    except ValueError:
+        return "unknown"
+
+    return "expired" if expiry < current_date else "not_expired"
+
+
 def find_relevant_alerts(
     claims: PackageClaims,
     alert_records: list[dict],
+    today: date | None = None,
 ) -> list[SafetyAlertEvidence]:
     """Find alerts supported by a product-name match plus another identifier."""
     relevant_alerts = []
@@ -261,6 +291,11 @@ def find_relevant_alerts(
                     source_url=alert["source_url"],
                     published_at=alert.get("published_at"),
                     alert_scope=alert.get("alert_scope"),
+                    batch_expiry_date=alert.get("expiry_date"),
+                    batch_expiry_status=classify_alert_batch_expiry(
+                        alert.get("expiry_date"),
+                        today=today,
+                    ),
                     explanation=(
                         "The package product name and at least one additional "
                         "identifier match this safety-alert record. This is "
@@ -284,6 +319,7 @@ def verify_package(
     safety_alerts = find_relevant_alerts(
         claims,
         alert_records or [],
+        today=today,
     )
 
     supplied_number = normalize_registration_number(

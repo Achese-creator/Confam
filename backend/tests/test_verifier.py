@@ -255,6 +255,78 @@ def test_duplicate_registration_numbers_do_not_hide_a_matching_alert():
     assert result.status == "high_risk_discrepancy_detected"
     assert len(result.safety_alerts) == 1
 
+
+def test_alert_batch_expiry_is_historical_after_expiry_month():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-EXPIRED-BATCH",
+        "title": "Historical batch alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "BATCH-7",
+        "expiry_date": "07/2026",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        matching_claims(),
+        [alert],
+        today=date(2026, 10, 15),
+    )
+
+    assert len(matches) == 1
+    assert matches[0].batch_expiry_date == "07/2026"
+    assert matches[0].batch_expiry_status == "expired"
+
+
+def test_alert_batch_expiry_is_not_expired_on_last_day_of_month():
+    from app.verifier import classify_alert_batch_expiry
+
+    assert classify_alert_batch_expiry(
+        "07/2026",
+        today=date(2026, 7, 31),
+    ) == "not_expired"
+
+
+def test_alert_batch_expiry_unknown_when_missing_or_invalid():
+    from app.verifier import classify_alert_batch_expiry
+
+    assert classify_alert_batch_expiry(
+        None,
+        today=date(2026, 10, 15),
+    ) == "unknown"
+    assert classify_alert_batch_expiry(
+        "not-a-date",
+        today=date(2026, 10, 15),
+    ) == "unknown"
+
+
+def test_expired_batch_does_not_remove_historical_alert_evidence():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-HISTORICAL",
+        "title": "Historical alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "BATCH-7",
+        "expiry_date": "2025-07-31",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        matching_claims(),
+        [alert],
+        today=date(2026, 10, 15),
+    )
+
+    assert len(matches) == 1
+    assert matches[0].batch_expiry_status == "expired"
+
+
 def test_alert_matches_exact_product_and_registration_number():
     from app.verifier import find_relevant_alerts
 

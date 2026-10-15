@@ -19,7 +19,7 @@ def test_registry_metadata_reports_curated_records():
     data = response.json()
 
     assert data["dataset_label"] == "curated_source_record"
-    assert data["record_count"] == 3
+    assert data["record_count"] == 6
     assert "snapshot" in data["source_note"].lower()
 
 
@@ -72,7 +72,7 @@ def test_alert_metadata_reports_curated_snapshot():
     assert response.status_code == 200
     data = response.json()
 
-    assert data["record_count"] == 1
+    assert data["record_count"] == 2
     assert "scope" in data["source_note"].lower()
 
 

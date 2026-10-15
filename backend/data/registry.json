@@ -1,7 +1,7 @@
 {
   "dataset_name": "CONFAM curated medicine registry snapshot",
   "schema_version": "1.0",
-  "retrieved_at": "2026-10-14",
+  "retrieved_at": "2026-10-15",
   "sources": [
     {
       "name": "NAFDAC Greenbook",
@@ -14,6 +14,18 @@
     {
       "name": "NAFDAC Greenbook",
       "url": "https://greenbook.nafdac.gov.ng/products/details/18"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/199"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/4969"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/885"
     }
   ],
   "records": [
@@ -57,6 +69,48 @@
       "source_name": "NAFDAC Greenbook",
       "source_url": "https://greenbook.nafdac.gov.ng/products/details/18",
       "retrieved_at": "2026-10-14",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Stalong 20 mg Tablets",
+      "active_ingredients": "Tadalafil",
+      "strength": "20 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "B4-1154",
+      "manufacturer": "Vapi Care Pharma Pvt Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2026-12-01",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/199",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Ibuprofen 400 mg Tablets",
+      "active_ingredients": "Ibuprofen",
+      "strength": "400 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "B4-6952",
+      "manufacturer": "Mancare Pharmaceuticals Pvt Ltd",
+      "registration_status": "Active",
+      "registration_expiry_date": "2028-01-25",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/4969",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Pregasafe 75 Pregabalin Capsules",
+      "active_ingredients": "Pregabalin",
+      "strength": "75 mg",
+      "dosage_form": "Capsule",
+      "nafdac_reg_number": "A4-9007",
+      "manufacturer": "MSN Laboratories Private Limited",
+      "registration_status": "Active",
+      "registration_expiry_date": "2028-12-20",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/885",
+      "retrieved_at": "2026-10-15",
       "dataset_label": "curated_source_record"
     }
   ]
