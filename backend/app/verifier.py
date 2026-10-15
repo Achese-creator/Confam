@@ -296,16 +296,53 @@ def find_relevant_alerts(
                         alert.get("expiry_date"),
                         today=today,
                     ),
+                    batch_match_status=(
+                        "match"
+                        if batch_matches
+                        else (
+                            "different"
+                            if package_batch and alert_batch
+                            else "not_checked"
+                        )
+                    ),
                     explanation=(
-                        "The package product name and at least one additional "
-                        "identifier match this safety-alert record. This is "
-                        "evidence requiring review, not proof that this "
-                        "individual package is affected."
+                        (
+                            "The product name and reported batch number match "
+                            "this safety-alert record. This is evidence "
+                            "requiring review, not proof that the package's "
+                            "contents are affected."
+                        )
+                        if batch_matches
+                        else (
+                            "The product name and registration number match "
+                            "this safety-alert record, but the supplied batch "
+                            "number differs from the reported batch. Review "
+                            "the original notice; this record does not establish "
+                            "that the supplied batch is affected."
+                        )
+                        if number_matches and package_batch and alert_batch
+                        else (
+                            "The product name and at least one additional "
+                            "identifier match this safety-alert record, but an "
+                            "exact batch comparison could not be completed. "
+                            "This is evidence requiring review, not proof that "
+                            "this individual package is affected."
+                        )
                     ),
                 )
             )
 
     return relevant_alerts
+
+
+def _alert_warrants_high_risk(
+    safety_alerts: list[SafetyAlertEvidence],
+) -> bool:
+    """Escalate for an exact reported-batch match, not product-level relevance alone."""
+    return any(
+        alert.batch_match_status == "match"
+        for alert in safety_alerts
+    )
 
 
 def verify_package(
@@ -330,12 +367,19 @@ def verify_package(
         return VerificationResult(
             status=(
                 "high_risk_discrepancy_detected"
-                if safety_alerts
+                if _alert_warrants_high_risk(safety_alerts)
                 else "verification_concern_detected"
             ),
             summary=(
-                "A relevant safety alert matches the supplied product "
-                "information. Seek professional or regulatory verification."
+                (
+                    "A reported-batch match was found in a relevant safety "
+                    "alert. Seek professional or regulatory verification."
+                    if _alert_warrants_high_risk(safety_alerts)
+                    else
+                    "A product-level safety alert is relevant, but the "
+                    "reported batch has not been confirmed. Review the notice "
+                    "and seek professional or regulatory verification."
+                )
                 if safety_alerts
                 else (
                     "No registration number was available to search. "
@@ -361,7 +405,7 @@ def verify_package(
         return VerificationResult(
             status=(
                 "high_risk_discrepancy_detected"
-                if safety_alerts
+                if _alert_warrants_high_risk(safety_alerts)
                 else "verification_concern_detected"
             ),
             summary=(
@@ -383,12 +427,19 @@ def verify_package(
         return VerificationResult(
             status=(
                 "high_risk_discrepancy_detected"
-                if safety_alerts
+                if _alert_warrants_high_risk(safety_alerts)
                 else "verification_concern_detected"
             ),
             summary=(
-                "A relevant safety alert matches the supplied product "
-                "information. Seek professional or regulatory verification."
+                (
+                    "A reported-batch match was found in a relevant safety "
+                    "alert. Seek professional or regulatory verification."
+                    if _alert_warrants_high_risk(safety_alerts)
+                    else
+                    "A product-level safety alert is relevant, but the "
+                    "reported batch has not been confirmed. Review the notice "
+                    "and seek professional or regulatory verification."
+                )
                 if safety_alerts
                 else (
                     "No matching registration number was found in the local dataset. "
@@ -506,12 +557,21 @@ def verify_package(
             )
 
     if safety_alerts:
-        status = "high_risk_discrepancy_detected"
-        summary = (
-            "A relevant safety alert matches the supplied product information. "
-            "Review the alert and seek professional or regulatory verification. "
-            "This does not establish that the individual package is affected."
-        )
+        if _alert_warrants_high_risk(safety_alerts):
+            status = "high_risk_discrepancy_detected"
+            summary = (
+                "A reported batch number matches a relevant safety alert. "
+                "Review the original notice and seek professional or "
+                "regulatory verification. This does not prove the contents "
+                "of the individual package."
+            )
+        elif status == "no_significant_discrepancy_detected":
+            status = "verification_concern_detected"
+            summary = (
+                "A product-level safety alert is relevant, but the reported "
+                "batch has not been confirmed. Review the original notice. "
+                "This does not prove that the individual package is affected."
+            )
 
     limitations = [
         "A registration-number match does not prove package authenticity.",

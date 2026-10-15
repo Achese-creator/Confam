@@ -88,6 +88,9 @@ class SafetyAlertEvidence(BaseModel):
     batch_expiry_status: Literal[
         "expired", "not_expired", "unknown"
     ] = "unknown"
+    batch_match_status: Literal[
+        "match", "different", "not_checked"
+    ] = "not_checked"
     explanation: str
 
 

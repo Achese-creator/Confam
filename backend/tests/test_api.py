@@ -151,3 +151,47 @@ def test_unrelated_product_is_not_flagged_by_shared_alert_number():
     assert result["safety_alerts"] == []
     assert result["matched_record"] is False
 
+
+
+
+def test_api_zacef_exact_reported_batch_triggers_high_risk():
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "ZACEF-TZ Injection",
+                "nafdac_reg_number": "A-46344",
+                "batch_number": "C-2308-02A",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "high_risk_discrepancy_detected"
+    assert len(result["safety_alerts"]) == 1
+    alert = result["safety_alerts"][0]
+    assert alert["alert_id"] == "NAFDAC-PUBLIC-ALERT-009-2024"
+    assert alert["batch_match_status"] == "match"
+
+
+def test_api_zacef_different_batch_does_not_escalate_from_alert_alone():
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "ZACEF-TZ Injection",
+                "nafdac_reg_number": "A-46344",
+                "batch_number": "UNRELATED-BATCH-999",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "verification_concern_detected"
+    assert len(result["safety_alerts"]) == 1
+    alert = result["safety_alerts"][0]
+    assert alert["alert_id"] == "NAFDAC-PUBLIC-ALERT-009-2024"
+    assert alert["batch_match_status"] == "different"
+    assert "does not establish" in alert["explanation"].lower()

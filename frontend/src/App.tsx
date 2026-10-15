@@ -34,6 +34,7 @@ type VerificationAlert = {
   alert_scope: string | null;
   batch_expiry_date: string | null;
   batch_expiry_status: "expired" | "not_expired" | "unknown";
+  batch_match_status: "match" | "different" | "not_checked";
   explanation: string;
 };
 
@@ -565,6 +566,14 @@ function App() {
                         <p>{alert.explanation}</p>
                         {alert.published_at && <p>Published: {alert.published_at}</p>}
                         {alert.alert_scope && <p>Scope: {alert.alert_scope}</p>}
+                        <p>
+                          Batch comparison:{" "}
+                          {alert.batch_match_status === "match"
+                            ? "Matches the batch reported in the alert"
+                            : alert.batch_match_status === "different"
+                              ? "Differs from the batch reported in the alert"
+                              : "Not checked — insufficient batch information"}
+                        </p>
                         {alert.batch_expiry_date && (
                           <p>
                             Reported batch expiry: {alert.batch_expiry_date} ·{" "}

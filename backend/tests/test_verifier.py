@@ -446,3 +446,170 @@ def test_revoked_registration_status_requires_high_risk_review():
     assert status_check.outcome == "mismatch"
     assert result.status == "high_risk_discrepancy_detected"
 
+
+
+def test_alert_does_not_match_same_product_and_registration_with_different_batch():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-DIFFERENT-BATCH",
+        "title": "Batch-specific alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "AFFECTED-001",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        matching_claims(batch_number="UNRELATED-999"),
+        [alert],
+    )
+
+    # The product alert remains relevant, but the package batch differs.
+    assert len(matches) == 1
+    assert matches[0].batch_match_status == "different"
+    assert "differs from the reported batch" in matches[0].explanation
+
+
+def test_alert_does_not_match_on_batch_number_when_product_name_is_dissimilar():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-DISSIMILAR-PRODUCT",
+        "title": "Batch-specific alert",
+        "product_name": "Completely Different Medicine",
+        "reported_registration_number": "OTHER-1234",
+        "batch_number": "BATCH-7",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        matching_claims(batch_number="BATCH-7"),
+        [alert],
+    )
+
+    assert matches == []
+
+
+def test_alert_does_not_match_on_registration_number_when_product_name_is_only_loosely_similar():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-LOOSE-NAME",
+        "title": "Test alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "OTHER-BATCH",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        PackageClaims(
+            product_name="Example",
+            nafdac_reg_number="A1-1234",
+            batch_number="UNRELATED-BATCH",
+        ),
+        [alert],
+    )
+
+    assert matches == []
+
+
+def test_product_and_registration_match_with_different_batch_is_concern_not_high_risk():
+    alert = {
+        "alert_id": "TEST-DIFFERENT-BATCH-RISK",
+        "title": "Batch-specific alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "AFFECTED-001",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    result = verify_package(
+        matching_claims(batch_number="UNRELATED-999"),
+        [sample_record()],
+        today=date(2026, 10, 15),
+        alert_records=[alert],
+    )
+
+    assert len(result.safety_alerts) == 1
+    assert result.safety_alerts[0].batch_match_status == "different"
+    assert result.status == "verification_concern_detected"
+    assert "batch has not been confirmed" in result.summary.lower()
+
+
+def test_exact_batch_match_escalates_to_high_risk():
+    alert = {
+        "alert_id": "TEST-EXACT-BATCH-RISK",
+        "title": "Batch-specific alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "BATCH-7",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    result = verify_package(
+        matching_claims(batch_number="BATCH-7"),
+        [sample_record()],
+        today=date(2026, 10, 15),
+        alert_records=[alert],
+    )
+
+    assert len(result.safety_alerts) == 1
+    assert result.safety_alerts[0].batch_match_status == "match"
+    assert result.status == "high_risk_discrepancy_detected"
+
+
+def test_unchecked_batch_keeps_alert_visible_without_alert_only_high_risk():
+    alert = {
+        "alert_id": "TEST-UNKNOWN-BATCH-RISK",
+        "title": "Product-level alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "BATCH-7",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    result = verify_package(
+        matching_claims(batch_number=None),
+        [sample_record()],
+        today=date(2026, 10, 15),
+        alert_records=[alert],
+    )
+
+    assert len(result.safety_alerts) == 1
+    assert result.safety_alerts[0].batch_match_status == "not_checked"
+    assert result.status == "verification_concern_detected"
+
+
+def test_independent_material_discrepancy_stays_high_risk_with_different_batch():
+    alert = {
+        "alert_id": "TEST-INDEPENDENT-RISK",
+        "title": "Batch-specific alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_number": "AFFECTED-001",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    claims = matching_claims(
+        batch_number="UNRELATED-999",
+        strength="900 mg",
+    )
+    result = verify_package(
+        claims,
+        [sample_record()],
+        today=date(2026, 10, 15),
+        alert_records=[alert],
+    )
+
+    assert result.safety_alerts[0].batch_match_status == "different"
+    assert result.status == "high_risk_discrepancy_detected"
+
