@@ -140,3 +140,54 @@ def test_valid_registration_expiry_uses_registry_only_scope():
     assert "no package-label comparison was performed" in (
         expiry_check.explanation
     )
+
+
+def test_active_registration_status_is_reported_as_registry_only():
+    result = verify_package(
+        matching_claims(),
+        [sample_record(registration_status="Active")],
+        today=date(2026, 10, 14),
+    )
+
+    status_check = next(
+        check for check in result.checks
+        if check.field == "registration_status"
+    )
+    assert status_check.outcome == "match"
+    assert status_check.reference_value == "Active"
+    assert status_check.package_value is None
+    assert status_check.check_scope == "registry_record_only"
+    assert "does not prove package authenticity" in status_check.explanation
+
+
+def test_non_active_registration_status_requires_high_risk_review():
+    result = verify_package(
+        matching_claims(),
+        [sample_record(registration_status="Suspended")],
+        today=date(2026, 10, 14),
+    )
+
+    status_check = next(
+        check for check in result.checks
+        if check.field == "registration_status"
+    )
+    assert result.status == "high_risk_discrepancy_detected"
+    assert status_check.outcome == "mismatch"
+    assert status_check.reference_value == "Suspended"
+    assert status_check.check_scope == "registry_record_only"
+
+
+def test_missing_registration_status_is_not_checked():
+    result = verify_package(
+        matching_claims(),
+        [sample_record(registration_status=None)],
+        today=date(2026, 10, 14),
+    )
+
+    status_check = next(
+        check for check in result.checks
+        if check.field == "registration_status"
+    )
+    assert status_check.outcome == "not_checked"
+    assert status_check.reference_value is None
+    assert status_check.check_scope == "registry_record_only"

@@ -108,6 +108,44 @@ def compare_product_name(
     )
 
 
+
+def check_registration_status(reference: RegistryRecord) -> FieldCheck:
+    """Report the status recorded in the registry; do not infer package authenticity."""
+    value = reference.registration_status
+
+    if not value:
+        return FieldCheck(
+            field="registration_status",
+            package_value=None,
+            reference_value=None,
+            outcome="not_checked",
+            check_scope="registry_record_only",
+            explanation="The reference record does not provide a registration status.",
+        )
+
+    status_text = normalize(value)
+    if status_text in {"registered", "active", "valid"}:
+        outcome = "match"
+        explanation = (
+            "The registry record reports an active/valid registration status. "
+            "This is registry-only information and does not prove package authenticity."
+        )
+    else:
+        outcome = "mismatch"
+        explanation = (
+            "The registry record reports a status requiring attention. "
+            "Check the cited source and seek professional or regulatory verification."
+        )
+
+    return FieldCheck(
+        field="registration_status",
+        package_value=None,
+        reference_value=value,
+        outcome=outcome,
+        check_scope="registry_record_only",
+        explanation=explanation,
+    )
+
 def check_expiry(
     reference: RegistryRecord,
     today: date | None = None,
@@ -297,6 +335,7 @@ def verify_package(
         )
 
     checks = [
+        check_registration_status(reference),
         compare_product_name(claims.product_name, reference.product_name),
         compare_text(
             "active_ingredients",
