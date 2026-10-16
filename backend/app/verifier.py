@@ -1,3 +1,4 @@
+from decimal import Decimal, InvalidOperation
 import re
 from calendar import monthrange
 from datetime import date
@@ -26,10 +27,21 @@ def normalize_registration_number(value: str | None) -> str:
 
 
 def normalize_strength(value: str | None) -> str:
-    """Normalize formatting while preserving the actual numbers and units."""
+    """Normalize strength formatting while preserving numeric meaning."""
     if not value:
         return ""
-    return re.sub(r"\s+", "", value.casefold()).replace(",", ".")
+
+    normalized = value.casefold().replace(",", ".")
+
+    def canonicalize_number(match: re.Match[str]) -> str:
+        try:
+            number = Decimal(match.group(0)).normalize()
+            return format(number, "f")
+        except InvalidOperation:
+            return match.group(0)
+
+    normalized = re.sub(r"\d+(?:\.\d+)?", canonicalize_number, normalized)
+    return re.sub(r"[^a-z0-9.]+", "", normalized)
 
 
 def compare_text(
@@ -46,7 +58,15 @@ def compare_text(
             explanation="One or both values are unavailable.",
         )
 
-    if normalize(package_value) == normalize(reference_value):
+    if field == "strength":
+        values_match = (
+            normalize_strength(package_value)
+            == normalize_strength(reference_value)
+        )
+    else:
+        values_match = normalize(package_value) == normalize(reference_value)
+
+    if values_match:
         return FieldCheck(
             field=field,
             package_value=package_value,

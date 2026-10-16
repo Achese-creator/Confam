@@ -664,3 +664,69 @@ def test_multi_batch_alert_does_not_high_risk_flag_unlisted_batch_alone():
     assert result.safety_alerts[0].batch_match_status == "different"
     assert result.safety_alerts[0].matched_batch_number is None
     assert result.status == "verification_concern_detected"
+
+
+def test_strength_formatting_difference_is_a_match():
+    result = verify_package(
+        matching_claims(strength="500mg"),
+        [sample_record(strength="500 mg")],
+        today=date(2026, 10, 14),
+    )
+
+    strength_check = next(
+        check for check in result.checks if check.field == "strength"
+    )
+    assert strength_check.outcome == "match"
+
+
+def test_strength_decimal_is_not_erased_during_comparison():
+    result = verify_package(
+        matching_claims(strength="10 mg"),
+        [sample_record(strength="1.0 mg")],
+        today=date(2026, 10, 14),
+    )
+
+    strength_check = next(
+        check for check in result.checks if check.field == "strength"
+    )
+    assert strength_check.outcome == "mismatch"
+    assert result.status == "high_risk_discrepancy_detected"
+
+
+def test_equivalent_decimal_strengths_match():
+    result = verify_package(
+        matching_claims(strength="1.0 mg"),
+        [sample_record(strength="1 mg")],
+        today=date(2026, 10, 14),
+    )
+
+    strength_check = next(
+        check for check in result.checks if check.field == "strength"
+    )
+    assert strength_check.outcome == "match"
+
+def test_strength_decimal_comma_matches_decimal_point():
+    result = verify_package(
+        matching_claims(strength="0,5 mg"),
+        [sample_record(strength="0.5 mg")],
+        today=date(2026, 10, 14),
+    )
+
+    strength_check = next(
+        check for check in result.checks if check.field == "strength"
+    )
+    assert strength_check.outcome == "match"
+
+
+def test_strength_different_units_do_not_match():
+    result = verify_package(
+        matching_claims(strength="250 mg"),
+        [sample_record(strength="250 mcg")],
+        today=date(2026, 10, 14),
+    )
+
+    strength_check = next(
+        check for check in result.checks if check.field == "strength"
+    )
+    assert strength_check.outcome == "mismatch"
+
