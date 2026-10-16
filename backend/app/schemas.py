@@ -115,3 +115,33 @@ class VerificationResult(BaseModel):
     source_url: str | None = None
     dataset_label: str | None = None
     limitations: list[str] = Field(default_factory=list)
+
+
+
+class PackageExtractionResult(BaseModel):
+    """Image extraction output that always requires human review."""
+
+    claims: PackageClaims
+    uncertain_fields: list[str] = Field(default_factory=list)
+    model_name: str
+    review_required: Literal[True] = True
+    limitations: list[str] = Field(
+        default_factory=lambda: [
+            "Extracted text may be incorrect or incomplete.",
+            "Extraction does not establish medicine authenticity or safety.",
+            "Review all extracted claims before verification.",
+        ]
+    )
+
+    @classmethod
+    def allowed_claim_fields(cls) -> set[str]:
+        return set(PackageClaims.model_fields)
+
+    @classmethod
+    def validate_uncertain_fields(cls, fields: list[str]) -> list[str]:
+        unknown = set(fields) - cls.allowed_claim_fields()
+        if unknown:
+            raise ValueError(
+                f"Unknown uncertain claim fields: {sorted(unknown)}"
+            )
+        return fields

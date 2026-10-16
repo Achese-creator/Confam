@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.schemas import (
@@ -9,8 +9,16 @@ from app.schemas import (
     RegistryRecord,
     SafetyAlertRecord,
     VerificationResult,
+    PackageExtractionResult,
 )
 from app.verifier import verify_package
+from app.extraction import ExtractionProviderError
+from app.gemini_extractor import GeminiPackageImageExtractor
+from app.image_validation import (
+    InvalidPackageImage,
+    MAX_IMAGE_BYTES,
+    validate_package_image,
+)
 from app.dataset_validation import (
     validate_alert_snapshot,
     validate_registry_snapshot,
@@ -130,3 +138,39 @@ def verify(request: VerifyRequest):
             "alerts_snapshot_retrieved_at": ALERT_DATA["retrieved_at"],
         }
     )
+
+
+
+@app.post("/api/v1/extract", response_model=PackageExtractionResult)
+async def extract_package_image(
+    image: UploadFile = File(..., description="Medicine package image"),
+):
+    """Extract visible package claims; this does not verify authenticity."""
+    try:
+        mime_type = (image.content_type or "").lower()
+        image_bytes = await image.read(MAX_IMAGE_BYTES + 1)
+
+        try:
+            mime_type = validate_package_image(image_bytes, mime_type)
+        except InvalidPackageImage as exc:
+            message = str(exc)
+            status_code = 413 if "5 MB" in message else 415
+            raise HTTPException(
+                status_code=status_code,
+                detail=message,
+            ) from exc
+
+        extractor = GeminiPackageImageExtractor()
+        return extractor.extract(image_bytes, mime_type)
+
+    except ExtractionProviderError as exc:
+        status_code = (
+            503 if "not configured" in str(exc).lower()
+            else 502
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail=str(exc),
+        ) from exc
+    finally:
+        await image.close()

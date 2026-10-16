@@ -4,3 +4,6 @@ pydantic
 rapidfuzz
 pytest
 httpx
+google-genai
+python-multipart
+Pillow
