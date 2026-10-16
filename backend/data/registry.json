@@ -58,6 +58,150 @@
     {
       "name": "NAFDAC Greenbook",
       "url": "https://greenbook.nafdac.gov.ng/products/details/4714"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/242"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/428"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/429"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/430"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/431"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/659"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/664"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/698"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/705"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/739"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/831"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/904"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/905"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/906"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1016"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1070"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1082"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1086"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1087"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1152"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1153"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1156"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1169"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1239"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1240"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1496"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1511"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1533"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1534"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1535"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1536"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1537"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1538"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1539"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1540"
+    },
+    {
+      "name": "NAFDAC Greenbook",
+      "url": "https://greenbook.nafdac.gov.ng/products/details/1541"
     }
   ],
   "records": [
@@ -254,6 +398,510 @@
       "registration_expiry_date": "2028-05-24",
       "source_name": "NAFDAC Greenbook",
       "source_url": "https://greenbook.nafdac.gov.ng/products/details/4714",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Paratex Syrup",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "B4-1594",
+      "manufacturer": "Phamatex Industries Ltd",
+      "registration_status": "Inactive",
+      "registration_expiry_date": "2026-06-23",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/242",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Panda Drops",
+      "active_ingredients": "Paracetamol",
+      "strength": "100 mg/mL",
+      "dosage_form": "Drops",
+      "nafdac_reg_number": "04-1956",
+      "manufacturer": "Afrab-Chem Limited",
+      "registration_status": "Inactive",
+      "registration_expiry_date": "2026-08-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/428",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Panda Syrup",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "04-1918",
+      "manufacturer": "Afrab-Chem Limited",
+      "registration_status": "Inactive",
+      "registration_expiry_date": "2026-08-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/429",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Panda Tablets",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "04-2019",
+      "manufacturer": "Afrab-Chem Limited",
+      "registration_status": "Inactive",
+      "registration_expiry_date": "2026-08-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/430",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Paratex Tablet",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "B4-1593",
+      "manufacturer": "Phamatex Industries Ltd",
+      "registration_status": "Inactive",
+      "registration_expiry_date": "2026-06-23",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/431",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Drugamol Syrup",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "04-8333",
+      "manufacturer": "Drugfield Pharmaceuticals Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-02-08",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/659",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Gauze Paracetamol Syrup",
+      "active_ingredients": "Paracetamol",
+      "strength": "120 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "04-3164",
+      "manufacturer": "Gauze Pharmaceutical and Laboratories Nigeria Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-02-08",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/664",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Obet Paracetamol Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "300 mg/2 mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "B4-9692",
+      "manufacturer": "Shanxi Zhongbao Shuguang Pharmaceutical Co., Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2024-01-31",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/698",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Afridol 300 Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "300 mg/2 mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "B4-9591",
+      "manufacturer": "Themis Medicare Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2024-01-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/705",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "M & B Paracetamol Tablet",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "04-0633",
+      "manufacturer": "May & Baker Nigeria PLC",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-02-08",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/739",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Paracetamol B. Braun 10 mg/mL Solution for Infusion",
+      "active_ingredients": "Paracetamol",
+      "strength": "10 mg/mL",
+      "dosage_form": "Solution for infusion",
+      "nafdac_reg_number": "B4-9914",
+      "manufacturer": "B. Braun Medical, S.A.",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2024-07-29",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/831",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Rexall Suppositories 125 mg",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg",
+      "dosage_form": "Suppository",
+      "nafdac_reg_number": "A11-100195",
+      "manufacturer": "Daily-Need Industries Limited",
+      "registration_status": "Inactive",
+      "registration_expiry_date": "2026-09-27",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/904",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Rexall Suppositories 250 mg",
+      "active_ingredients": "Paracetamol",
+      "strength": "250 mg",
+      "dosage_form": "Suppository",
+      "nafdac_reg_number": "A11-100194",
+      "manufacturer": "Daily-Need Industries Limited",
+      "registration_status": "Inactive",
+      "registration_expiry_date": "2026-09-27",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/905",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Rexall Suppositories 500 mg",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Suppository",
+      "nafdac_reg_number": "A11-100193",
+      "manufacturer": "Daily-Need Industries Limited",
+      "registration_status": "Inactive",
+      "registration_expiry_date": "2026-09-27",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/906",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Barimol Paracetamol Syrup",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "A11-0701",
+      "manufacturer": "Barka Pharmaceutical Company Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-07-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1016",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Bonadol Caplets",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Caplet",
+      "nafdac_reg_number": "04-5762",
+      "manufacturer": "Bond Chemical Industries Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-07-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1070",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Faith Paracetamol Elixir",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "04-2049",
+      "manufacturer": "Oak-Faith Pharmaceutical Resources Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-07-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1082",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Ausdol 250 mg Tablet",
+      "active_ingredients": "Paracetamol",
+      "strength": "250 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A11-0768",
+      "manufacturer": "Auscel Laboratories Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1086",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Ausdol 500 mg Tablet",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A11-0770",
+      "manufacturer": "Auscel Laboratories Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1087",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Drugamol Paracetamol Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "300 mg/2 mL",
+      "dosage_form": "Injection",
+      "nafdac_reg_number": "B4-9341",
+      "manufacturer": "Guilin Pharmaceutical Co., Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-11-28",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1152",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Avro Paracetamol Tablets",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A4-8338",
+      "manufacturer": "SKG - Pharma Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1153",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Acepol Paracetamol Suspension",
+      "active_ingredients": "Paracetamol",
+      "strength": "120 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "A4-0704",
+      "manufacturer": "SKG - Pharma Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1156",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Bioramol Tablets",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "04-9033",
+      "manufacturer": "Bioraj Pharmaceuticals Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1169",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Moxie Paracetamol Suspension",
+      "active_ingredients": "Paracetamol",
+      "strength": "120 mg/5 mL",
+      "dosage_form": "Suspension",
+      "nafdac_reg_number": "A11-0803",
+      "manufacturer": "Oak-Faith Pharmaceutical Resources Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-11-28",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1239",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Mildol Paracetamol Syrup",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "04-5579",
+      "manufacturer": "Asad Pharmaceuticals Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1240",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "BG Paracetamol Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "300 mg/2 mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "B4-9089",
+      "manufacturer": "Shanxi Zhongbao Shuguang Pharmaceutical Co., Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1496",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Freshborn Paracetamol Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "150 mg/mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "B4-9481",
+      "manufacturer": "Alpa Laboratories Pvt Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-12-19",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1511",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Mannypara Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "150 mg/mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "B4-9051",
+      "manufacturer": "Ciron Drugs & Pharmaceuticals Pvt Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1533",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Nacemol Tablet",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "04-1962",
+      "manufacturer": "Nigerian Army Drug Manufacturing Co. (NADMACO)",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-06-27",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1534",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Nelb Paracetamol Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "150 mg/mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "B4-9065",
+      "manufacturer": "Nitin Lifesciences Limited",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1535",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Novamed Paracetamol Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "300 mg/2 mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "B4-9332",
+      "manufacturer": "Jiangsu Pengyao Pharmaceutical Co. Ltd.",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-11-28",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1536",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Olphin Paracetamol 150 mg/mL",
+      "active_ingredients": "Paracetamol",
+      "strength": "300 mg/2 mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "B4-9330",
+      "manufacturer": "Jiangsu Ruinian Qianjin Pharmaceutical Co. Ltd.",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-11-28",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1537",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Parabeta-P Injection",
+      "active_ingredients": "Paracetamol",
+      "strength": "300 mg/2 mL",
+      "dosage_form": "Solution for injection",
+      "nafdac_reg_number": "04-9673",
+      "manufacturer": "Anhui Chengshi Pharmaceutical Co., Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1538",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Paracetamol Syrup",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "04-3414",
+      "manufacturer": "Tuyil Pharmaceutical Industries Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-10-02",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1539",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Peace Paracetamol Tablet",
+      "active_ingredients": "Paracetamol",
+      "strength": "500 mg",
+      "dosage_form": "Tablet",
+      "nafdac_reg_number": "A4-6847",
+      "manufacturer": "Peace Standard Pharmaceutical Industries Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-07-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1540",
+      "retrieved_at": "2026-10-15",
+      "dataset_label": "curated_source_record"
+    },
+    {
+      "product_name": "Sebesmol Paracetamol Syrup",
+      "active_ingredients": "Paracetamol",
+      "strength": "125 mg/5 mL",
+      "dosage_form": "Syrup",
+      "nafdac_reg_number": "04-1473",
+      "manufacturer": "Seebest Pharmaceutical Chemist Ltd",
+      "registration_status": "Expired",
+      "registration_expiry_date": "2023-07-30",
+      "source_name": "NAFDAC Greenbook",
+      "source_url": "https://greenbook.nafdac.gov.ng/products/details/1541",
       "retrieved_at": "2026-10-15",
       "dataset_label": "curated_source_record"
     }

@@ -62,6 +62,7 @@ class SafetyAlertRecord(BaseModel):
     reference_product_strength: str | None = None
     reference_manufacturer: str | None = None
     batch_number: str | None = None
+    batch_numbers: list[str] = Field(default_factory=list)
     manufacturing_date: str | None = None
     expiry_date: str | None = None
     alert_scope: str | None = None
@@ -84,6 +85,8 @@ class SafetyAlertEvidence(BaseModel):
     source_url: str
     published_at: str | None = None
     alert_scope: str | None = None
+    reported_batch_numbers: list[str] = Field(default_factory=list)
+    matched_batch_number: str | None = None
     batch_expiry_date: str | None = None
     batch_expiry_status: Literal[
         "expired", "not_expired", "unknown"

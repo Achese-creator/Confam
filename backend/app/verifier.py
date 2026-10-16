@@ -264,7 +264,32 @@ def find_relevant_alerts(
         alert_number = normalize_registration_number(
             alert.get("reported_registration_number")
         )
-        alert_batch = normalize(alert.get("batch_number"))
+        raw_batches = alert.get("batch_numbers") or []
+        if isinstance(raw_batches, str):
+            raw_batches = [raw_batches]
+
+        reported_batches = []
+        for value in [alert.get("batch_number"), *raw_batches]:
+            if isinstance(value, str) and value.strip():
+                if value.strip() not in reported_batches:
+                    reported_batches.append(value.strip())
+
+        normalized_batches = {
+            normalize_registration_number(value)
+            for value in reported_batches
+            if normalize_registration_number(value)
+        }
+        matching_batches = (
+            [
+                value
+                for value in reported_batches
+                if normalize_registration_number(value) == normalize_registration_number(claims.batch_number)
+            ]
+            if claims.batch_number
+            else []
+        )
+        batch_matches = bool(matching_batches)
+        has_reported_batches = bool(normalized_batches)
 
         name_matches = (
             bool(alert_name)
@@ -275,12 +300,6 @@ def find_relevant_alerts(
             and bool(alert_number)
             and package_number == alert_number
         )
-        batch_matches = (
-            bool(package_batch)
-            and bool(alert_batch)
-            and package_batch == alert_batch
-        )
-
         if name_matches and (number_matches or batch_matches):
             relevant_alerts.append(
                 SafetyAlertEvidence(
@@ -291,6 +310,10 @@ def find_relevant_alerts(
                     source_url=alert["source_url"],
                     published_at=alert.get("published_at"),
                     alert_scope=alert.get("alert_scope"),
+                    reported_batch_numbers=reported_batches,
+                    matched_batch_number=(
+                        matching_batches[0] if matching_batches else None
+                    ),
                     batch_expiry_date=alert.get("expiry_date"),
                     batch_expiry_status=classify_alert_batch_expiry(
                         alert.get("expiry_date"),
@@ -301,14 +324,15 @@ def find_relevant_alerts(
                         if batch_matches
                         else (
                             "different"
-                            if package_batch and alert_batch
+                            if package_batch and has_reported_batches
                             else "not_checked"
                         )
                     ),
                     explanation=(
                         (
-                            "The product name and reported batch number match "
-                            "this safety-alert record. This is evidence "
+                            "The product name and supplied batch number match "
+                            "one of the batches reported in this safety-alert "
+                            "record. This is evidence "
                             "requiring review, not proof that the package's "
                             "contents are affected."
                         )
@@ -316,11 +340,11 @@ def find_relevant_alerts(
                         else (
                             "The product name and registration number match "
                             "this safety-alert record, but the supplied batch "
-                            "number differs from the reported batch. Review "
+                            "number differs from the reported batch or batches. Review "
                             "the original notice; this record does not establish "
                             "that the supplied batch is affected."
                         )
-                        if number_matches and package_batch and alert_batch
+                        if number_matches and package_batch and has_reported_batches
                         else (
                             "The product name and at least one additional "
                             "identifier match this safety-alert record, but an "

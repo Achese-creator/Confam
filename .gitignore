@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated registry and alert candidates
+/backend/data/candidates/*.json

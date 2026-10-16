@@ -613,3 +613,54 @@ def test_independent_material_discrepancy_stays_high_risk_with_different_batch()
     assert result.safety_alerts[0].batch_match_status == "different"
     assert result.status == "high_risk_discrepancy_detected"
 
+
+
+
+def test_alert_matches_any_reported_batch_in_multi_batch_notice():
+    from app.verifier import find_relevant_alerts
+
+    alert = {
+        "alert_id": "TEST-MULTI-BATCH",
+        "title": "Notice covering multiple batches",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_numbers": ["BATCH-1", "BATCH-2", "BATCH-3"],
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    matches = find_relevant_alerts(
+        matching_claims(batch_number="BATCH-2"),
+        [alert],
+    )
+
+    assert len(matches) == 1
+    assert matches[0].batch_match_status == "match"
+    assert matches[0].reported_batch_numbers == [
+        "BATCH-1", "BATCH-2", "BATCH-3"
+    ]
+    assert matches[0].matched_batch_number == "BATCH-2"
+
+
+def test_multi_batch_alert_does_not_high_risk_flag_unlisted_batch_alone():
+    alert = {
+        "alert_id": "TEST-MULTI-BATCH-DIFFERENT",
+        "title": "Notice covering multiple batches",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "A1-1234",
+        "batch_numbers": ["BATCH-1", "BATCH-2"],
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/alert",
+    }
+
+    result = verify_package(
+        matching_claims(batch_number="UNLISTED-BATCH"),
+        [sample_record()],
+        today=date(2026, 10, 15),
+        alert_records=[alert],
+    )
+
+    assert len(result.safety_alerts) == 1
+    assert result.safety_alerts[0].batch_match_status == "different"
+    assert result.safety_alerts[0].matched_batch_number is None
+    assert result.status == "verification_concern_detected"

@@ -18,20 +18,23 @@ def test_audit_reports_current_snapshot_counts_and_validation():
     report = audit_snapshots(
         read_snapshot("registry.json"),
         read_snapshot("alerts.json"),
-        as_of=date(2026, 10, 15),
+        as_of=date(2026, 10, 16),
     )
 
     assert report["datasets"]["registry"]["record_count"] == len(read_snapshot("registry.json")["records"])
-    assert report["datasets"]["alerts"]["record_count"] == 5
+    assert report["datasets"]["alerts"]["record_count"] == len(read_snapshot("alerts.json")["records"])
     assert report["datasets"]["registry"]["validation_passed"] is True
     assert report["datasets"]["alerts"]["validation_passed"] is True
 
 
 def test_audit_warns_about_small_snapshots():
+    alerts = read_snapshot("alerts.json")
+    alerts["records"] = alerts["records"][:5]
+
     report = audit_snapshots(
         read_snapshot("registry.json"),
-        read_snapshot("alerts.json"),
-        as_of=date(2026, 10, 15),
+        alerts,
+        as_of=date(2026, 10, 16),
     )
 
     codes = {finding["code"] for finding in report["findings"]}
@@ -46,17 +49,26 @@ def test_audit_reports_optional_field_completeness():
     report = audit_snapshots(
         registry,
         read_snapshot("alerts.json"),
-        as_of=date(2026, 10, 15),
+        as_of=date(2026, 10, 16),
     )
 
     manufacturer = report["datasets"]["registry"][
         "optional_field_completeness"
     ]["manufacturer"]
 
+    total_records = len(registry["records"])
+    populated_records = sum(
+        isinstance(record.get("manufacturer"), str)
+        and bool(record["manufacturer"].strip())
+        for record in registry["records"]
+    )
+
     assert manufacturer == {
-        "populated": 13,
-        "missing": 1,
-        "completeness_percent": 92.9,
+        "populated": populated_records,
+        "missing": total_records - populated_records,
+        "completeness_percent": round(
+            populated_records / total_records * 100, 1
+        ) if total_records else 0.0,
     }
 
 
@@ -69,7 +81,7 @@ def test_audit_flags_duplicate_registration_numbers():
     report = audit_snapshots(
         registry,
         read_snapshot("alerts.json"),
-        as_of=date(2026, 10, 15),
+        as_of=date(2026, 10, 16),
     )
 
     assert report["datasets"]["registry"]["validation_passed"] is False
@@ -97,7 +109,7 @@ def test_audit_explains_its_scope_and_limitations():
     report = audit_snapshots(
         read_snapshot("registry.json"),
         read_snapshot("alerts.json"),
-        as_of=date(2026, 10, 15),
+        as_of=date(2026, 10, 16),
     )
 
     assert "does not verify medicine authenticity" in report["purpose"]

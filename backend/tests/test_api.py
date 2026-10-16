@@ -78,7 +78,11 @@ def test_alert_metadata_reports_curated_snapshot():
     assert response.status_code == 200
     data = response.json()
 
-    assert data["record_count"] == 5
+    records_response = client.get("/api/v1/alerts/records")
+    assert records_response.status_code == 200
+
+    records = records_response.json()["records"]
+    assert data["record_count"] == len(records)
     assert "scope" in data["source_note"].lower()
 
 

@@ -37,7 +37,7 @@ def test_current_registry_snapshot_passes_integrity_checks():
 def test_current_alert_snapshot_passes_integrity_checks():
     records = validate_alert_snapshot(alert_snapshot())
 
-    assert len(records) == 5
+    assert len(records) == len(alert_snapshot()["records"])
     assert records[0].alert_id == "NAFDAC-PUBLIC-ALERT-037-2025"
 
 
