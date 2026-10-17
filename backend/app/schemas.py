@@ -107,6 +107,7 @@ class VerificationResult(BaseModel):
         "high_risk_discrepancy_detected",
     ]
     summary: str
+    briefing: str | None = None
     matched_record: bool
     registry_snapshot_retrieved_at: str | None = None
     alerts_snapshot_retrieved_at: str | None = None

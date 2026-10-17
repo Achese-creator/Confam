@@ -278,7 +278,7 @@ def check_package_expiry(
 ) -> FieldCheck:
     """Assess printed package expiry independently of registration expiry.
 
-    Supports DD-MM-YYYY, MM/YYYY, and ISO YYYY-MM-DD.
+    Supports DD-MM-YYYY, MM/YY, MM/YYYY, and ISO YYYY-MM-DD.
     Month/year expiry remains valid through the final day of that month.
     This check does not establish authenticity.
     """
@@ -304,6 +304,10 @@ def check_package_expiry(
         elif re.fullmatch(r"\d{2}-\d{2}-\d{4}", raw_value):
             day, month, year = map(int, raw_value.split("-"))
             expiry = date(year, month, day)
+        elif re.fullmatch(r"\d{2}/\d{2}", raw_value):
+            month, short_year = map(int, raw_value.split("/"))
+            year = 2000 + short_year
+            expiry = date(year, month, monthrange(year, month)[1])
         elif re.fullmatch(r"\d{2}/\d{4}", raw_value):
             month, year = map(int, raw_value.split("/"))
             expiry = date(year, month, monthrange(year, month)[1])

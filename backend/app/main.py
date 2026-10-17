@@ -14,6 +14,7 @@ from app.schemas import (
 from app.verifier import verify_package
 from app.extraction import ExtractionProviderError
 from app.gemini_extractor import GeminiPackageImageExtractor
+from app.gemini_briefing import generate_evidence_briefing
 from app.image_validation import (
     InvalidPackageImage,
     MAX_IMAGE_BYTES,
@@ -132,13 +133,68 @@ def verify(request: VerifyRequest):
         REGISTRY_RECORDS,
         alert_records=ALERT_RECORDS,
     )
-    return result.model_copy(
+    result = result.model_copy(
         update={
             "registry_snapshot_retrieved_at": REGISTRY_DATA["retrieved_at"],
             "alerts_snapshot_retrieved_at": ALERT_DATA["retrieved_at"],
         }
     )
+    return result.model_copy(
+        update={"briefing": generate_evidence_briefing(result)}
+    )
 
+
+
+@app.post("/api/v1/extract-multiple", response_model=PackageExtractionResult)
+async def extract_multiple_package_images(
+    images: list[UploadFile] = File(
+        ...,
+        description="One to six views of the same medicine package",
+    ),
+):
+    """Extract visible claims from multiple package views; this does not verify authenticity."""
+    try:
+        if not 1 <= len(images) <= 6:
+            raise HTTPException(
+                status_code=413 if len(images) > 6 else 422,
+                detail="Upload between one and six package photos.",
+            )
+
+        validated_images: list[tuple[bytes, str]] = []
+
+        for index, image in enumerate(images, start=1):
+            mime_type = (image.content_type or "").lower()
+            image_bytes = await image.read(MAX_IMAGE_BYTES + 1)
+
+            try:
+                mime_type = validate_package_image(image_bytes, mime_type)
+            except InvalidPackageImage as exc:
+                message = f"Photo {index}: {exc}"
+                status_code = 413 if "5 MB" in str(exc) else 415
+                raise HTTPException(
+                    status_code=status_code,
+                    detail=message,
+                ) from exc
+
+            validated_images.append((image_bytes, mime_type))
+
+        extractor = GeminiPackageImageExtractor()
+        return extractor.extract_multiple(validated_images)
+
+    except HTTPException:
+        raise
+    except ExtractionProviderError as exc:
+        status_code = (
+            503 if "not configured" in str(exc).lower()
+            else 502
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail=str(exc),
+        ) from exc
+    finally:
+        for image in images:
+            await image.close()
 
 
 @app.post("/api/v1/extract", response_model=PackageExtractionResult)

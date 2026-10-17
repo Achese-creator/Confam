@@ -688,3 +688,185 @@ button:focus-visible, a:focus-visible { outline: 3px solid #5bbab2; outline-offs
   font-size: 0.875rem;
   color: var(--text-muted, #526675);
 }
+
+
+/* Make the post-result action easy to find. */
+.result-new-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 18px 0 24px;
+  min-height: 46px;
+  padding: 0 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+
+/* Multi-photo medicine-package upload */
+.photo-guidance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.photo-guidance span {
+  border: 1px solid #d7e5eb;
+  border-radius: 6px;
+  background: #f3f8fa;
+  color: #274c5e;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.photo-input-label {
+  display: block;
+  margin-top: 12px;
+  padding: 14px 15px;
+  border: 1px solid #d7e5eb;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #274c5e;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.photo-input-label:hover {
+  border-color: #8bb9c9;
+  background: #f7fbfc;
+}
+
+.photo-input-label:focus-within {
+  outline: 2px solid #397f7b;
+  outline-offset: 2px;
+}
+
+.photo-input-label .image-file-input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 9px;
+  color: #506777;
+  font: 12px 'DM Sans', sans-serif;
+}
+
+.photo-input-label .image-file-input::file-selector-button {
+  margin-right: 10px;
+  padding: 9px 12px;
+  border: 1px solid #c9dfe7;
+  border-radius: 7px;
+  background: #eef7fa;
+  color: #274c5e;
+  font: 600 12px 'DM Sans', sans-serif;
+  cursor: pointer;
+}
+
+.photo-input-label .image-file-input:disabled {
+  cursor: not-allowed;
+}
+
+.photo-input-label:has(.image-file-input:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.photo-count {
+  margin-top: 17px;
+  color: #397f7b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.selected-image-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.selected-image-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e1e9ed;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.selected-image-list li > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: #274c5e;
+  font-size: 12px;
+}
+
+.selected-image-filename {
+  overflow-wrap: anywhere;
+  color: #71818d;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.remove-photo-button {
+  flex: 0 0 auto;
+  border: 1px solid #d7e5eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #913d3d;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.remove-photo-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 700px) {
+  .image-upload-panel {
+    padding: 16px;
+  }
+
+  .image-file-input {
+    width: 100%;
+    max-width: 100%;
+    font-size: 12px;
+  }
+
+  .photo-guidance {
+    gap: 6px;
+  }
+
+  .photo-guidance span {
+    font-size: 10px;
+  }
+
+  .selected-image-list li {
+    align-items: flex-start;
+    padding: 10px;
+  }
+
+  .remove-photo-button {
+    padding: 8px;
+  }
+
+  .image-upload-panel .primary-button {
+    width: 100%;
+    justify-content: space-between;
+    min-height: 46px;
+  }
+}

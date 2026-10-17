@@ -44,6 +44,7 @@ type VerificationResult = {
     | "verification_concern_detected"
     | "high_risk_discrepancy_detected";
   summary: string;
+  briefing?: string | null;
   matched_record: boolean;
   registry_snapshot_retrieved_at: string | null;
   alerts_snapshot_retrieved_at: string | null;
@@ -158,7 +159,7 @@ function App() {
   const [verification, setVerification] = useState<VerificationResult | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [verificationError, setVerificationError] = useState("");
-  const [packageImage, setPackageImage] = useState<File | null>(null);
+  const [packageImages, setPackageImages] = useState<File[]>([]);
   const [extractionLoading, setExtractionLoading] = useState(false);
   const [extractionError, setExtractionError] = useState("");
   const [uncertainFields, setUncertainFields] = useState<string[]>([]);
@@ -250,8 +251,45 @@ function App() {
     }
   }
 
+  function addPackageImages(selectedFiles: File[]) {
+    const supportedTypes = ["image/png", "image/jpeg", "image/webp"];
+    const errors: string[] = [];
+    const validFiles: File[] = [];
+
+    for (const file of selectedFiles) {
+      if (!supportedTypes.includes(file.type)) {
+        errors.push(`${file.name}: choose a PNG, JPEG, or WebP image.`);
+      } else if (file.size > 5 * 1024 * 1024) {
+        errors.push(`${file.name}: the image exceeds the 5 MB limit.`);
+      } else {
+        validFiles.push(file);
+      }
+    }
+
+    const availableSlots = Math.max(0, 6 - packageImages.length);
+    const acceptedFiles = validFiles.slice(0, availableSlots);
+
+    if (validFiles.length > availableSlots) {
+      errors.push("A check can contain no more than six photos.");
+    }
+
+    if (acceptedFiles.length > 0) {
+      setPackageImages((current) => [...current, ...acceptedFiles]);
+      setExtractionError("");
+      setVerification(null);
+      setVerificationError("");
+      setUncertainFields([]);
+      setExtractionModel("");
+      setExtractionLimitations([]);
+    }
+
+    if (errors.length > 0) {
+      setExtractionError(errors.join(" "));
+    }
+  }
+
   async function extractPackageImage() {
-    if (!packageImage || extractionLoading) return;
+    if (packageImages.length === 0 || extractionLoading) return;
 
     setExtractionLoading(true);
     setExtractionError("");
@@ -260,9 +298,11 @@ function App() {
 
     try {
       const formData = new FormData();
-      formData.append("image", packageImage);
+      for (const file of packageImages) {
+        formData.append("images", file);
+      }
 
-      const response = await fetch("/api/v1/extract", {
+      const response = await fetch("/api/v1/extract-multiple", {
         method: "POST",
         body: formData,
       });
@@ -280,8 +320,7 @@ function App() {
 
       const result: PackageExtractionResponse = await response.json();
 
-      // Only non-empty extracted values replace existing form values.
-      // Missing or unreadable fields do not erase information already entered.
+      // Missing or unreadable extraction results never erase manually entered data.
       setClaims((current) => {
         const updated = { ...current };
 
@@ -302,7 +341,7 @@ function App() {
       setExtractionError(
         error instanceof Error
           ? error.message
-          : "Unable to extract package details from this image.",
+          : "Unable to extract package details from these photos.",
       );
     } finally {
       setExtractionLoading(false);
@@ -448,76 +487,100 @@ function App() {
 
               <div className="upload-panel image-upload-panel">
                 <div className="upload-symbol">↑</div>
-                <h2>Package image analysis</h2>
+                <h2>Medicine package photos</h2>
                 <p>
-                  Choose a clear photo of the medicine packaging. Extracted
-                  details will populate the fields below for your review.
-                  Unreadable fields are left unchanged.
+                  Add 1–6 clear photos of the same pack. Include the front,
+                  back, sides, and top or bottom where available. Keep text
+                  in focus, avoid glare, and photograph the printed batch
+                  and expiry details. You can add photos in more than one step.
                 </p>
 
-                <input
-                  className="image-file-input"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  aria-label="Choose a medicine package image"
-                  onChange={(event) => {
-                    const file = event.currentTarget.files?.[0] ?? null;
+                <div className="photo-guidance" aria-label="Suggested package views">
+                  <span>1. Front</span>
+                  <span>2. Back</span>
+                  <span>3. Left / right side</span>
+                  <span>4. Top / bottom</span>
+                </div>
 
-                    setExtractionError("");
-                    setVerification(null);
-                    setVerificationError("");
-                    setUncertainFields([]);
-                    setExtractionModel("");
-                    setExtractionLimitations([]);
-
-                    if (!file) {
-                      setPackageImage(null);
-                      return;
-                    }
-
-                    const supportedTypes = [
-                      "image/png",
-                      "image/jpeg",
-                      "image/webp",
-                    ];
-
-                    if (!supportedTypes.includes(file.type)) {
-                      setPackageImage(null);
-                      setExtractionError(
-                        "Choose a PNG, JPEG, or WebP image.",
-                      );
+                <label className="photo-input-label">
+                  Choose from gallery or files
+                  <input
+                    className="image-file-input"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    aria-label="Add medicine package photos"
+                    disabled={extractionLoading || packageImages.length >= 6}
+                    onChange={(event) => {
+                      const files = Array.from(event.currentTarget.files ?? []);
                       event.currentTarget.value = "";
-                      return;
-                    }
+                      if (files.length > 0) addPackageImages(files);
+                    }}
+                  />
+                </label>
 
-                    if (file.size > 5 * 1024 * 1024) {
-                      setPackageImage(null);
-                      setExtractionError(
-                        "The image exceeds the 5 MB upload limit.",
-                      );
+                <label className="photo-input-label camera-input-label">
+                  Take a photo with your camera
+                  <input
+                    className="image-file-input"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    capture="environment"
+                    aria-label="Take a medicine package photo"
+                    disabled={extractionLoading || packageImages.length >= 6}
+                    onChange={(event) => {
+                      const files = Array.from(event.currentTarget.files ?? []);
                       event.currentTarget.value = "";
-                      return;
-                    }
+                      if (files.length > 0) addPackageImages(files);
+                    }}
+                  />
+                </label>
 
-                    setPackageImage(file);
-                  }}
-                />
+                <div className="photo-count" role="status">
+                  {packageImages.length} of 6 photos selected
+                </div>
 
-                {packageImage && (
-                  <p className="selected-image-name">
-                    Selected: <strong>{packageImage.name}</strong>
-                  </p>
+                {packageImages.length > 0 && (
+                  <ul className="selected-image-list">
+                    {packageImages.map((file, index) => (
+                      <li key={`${file.name}-${file.size}-${file.lastModified}-${index}`}>
+                        <span>
+                          <strong>Photo {index + 1}</strong>
+                          <span className="selected-image-filename">{file.name}</span>
+                        </span>
+                        <button
+                          className="remove-photo-button"
+                          type="button"
+                          disabled={extractionLoading}
+                          onClick={() => {
+                            setPackageImages((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index),
+                            );
+                            setExtractionError("");
+                            setVerification(null);
+                            setVerificationError("");
+                            setUncertainFields([]);
+                            setExtractionModel("");
+                            setExtractionLimitations([]);
+                          }}
+                          aria-label={`Remove photo ${index + 1}`}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
 
                 <button
                   className="primary-button"
                   type="button"
-                  disabled={!packageImage || extractionLoading}
+                  disabled={packageImages.length === 0 || extractionLoading}
                   onClick={() => void extractPackageImage()}
                 >
                   {extractionLoading
-                    ? "Reading package image…"
-                    : "Extract package details"}
+                    ? "Reading package photos…"
+                    : `Extract details from ${packageImages.length} photo${packageImages.length === 1 ? "" : "s"}`}
                   {!extractionLoading && <span>↑</span>}
                 </button>
 
@@ -527,16 +590,12 @@ function App() {
                   </p>
                 )}
               </div>
-
               {extractionModel && (
                 <div className="extraction-review-note" role="status">
                   <div className="extraction-review-heading">
                     <strong>Review extracted claims</strong>
                     <span className="coming-soon">REVIEW REQUIRED</span>
                   </div>
-                  <p>
-                    Extractor: <strong>{extractionModel}</strong>
-                  </p>
 
                   {uncertainFields.length > 0 ? (
                     <p>
@@ -728,7 +787,7 @@ function App() {
                 <h3>Field-by-field comparison</h3>
                 {verification.checks.length > 0 ? (
                   <div className="checks-list">
-                    {verification.checks.map((check, index) => (
+                    {verification.checks.filter((check) => check.field !== "registration_expiry_date").map((check, index) => (
                       <article className="check-row" key={`${check.field}-${index}`}>
                         <div className="check-row-heading">
                           <strong>{fieldLabels[check.field] || check.field.replaceAll("_", " ")}</strong>
@@ -743,13 +802,19 @@ function App() {
                         <div className="check-values">
                           <p><span>Package claim</span>{check.package_value || "Not provided"}</p>
                           <p><span>Reference record</span>{check.reference_value || "Not available"}</p>
+                          {check.field === "expiry_date" && (
+                            <p>
+                              <span>Expiry status</span>
+                              {check.outcome === "match"
+                                ? "Not expired"
+                                : check.outcome === "mismatch"
+                                  ? "Expired"
+                                  : "Could not determine"}
+                            </p>
+                          )}
                         </div>
-                        <p className="check-explanation">{check.explanation}</p>
-                        {check.check_scope === "registry_record_only" && (
-                          <p className="check-scope-label">Registry record check — not a package-label comparison</p>
-                        )}
-                        {check.check_scope === "package_only" && (
-                          <p className="check-scope-label">Package-only check — assessed independently; not compared with the registry</p>
+                        {check.outcome !== "match" && (
+                          <p className="check-explanation">{check.explanation}</p>
                         )}
                       </article>
                     ))}
@@ -796,6 +861,33 @@ function App() {
                   </div>
                 )}
 
+                <div className="result-briefing">
+                  <h3>Evidence briefing</h3>
+                  <p>
+                    {verification.briefing ||
+                      verification.summary +
+                        " Review the field comparisons and relevant safety alerts above. " +
+                        "A matching registration number does not establish physical authenticity."}
+                  </p>
+                </div>
+
+                <button
+                  className="primary-button result-new-check"
+                  onClick={() => {
+                    setVerification(null);
+                    setVerificationError("");
+                    setClaims(emptyClaims);
+                    setPackageImages([]);
+                    setExtractionError("");
+                    setUncertainFields([]);
+                    setExtractionModel("");
+                    setExtractionLimitations([]);
+                    setView("verify");
+                  }}
+                >
+                  Start a new check
+                </button>
+
                 <div className="result-limitations">
                   <h3>What this result cannot establish</h3>
                   <ul>
@@ -804,32 +896,6 @@ function App() {
                     ))}
                     <li>A matching registration number or no detected discrepancy does not prove physical authenticity.</li>
                   </ul>
-                </div>
-
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    setVerification(null);
-                    setVerificationError("");
-                    setClaims(emptyClaims);
-                  }}
-                >
-                  Start a new check
-                </button>
-                <div className="result-briefing">
-                  <h3>Evidence briefing</h3>
-                  <p>{verification.summary}</p>
-                  {verification.checks.find((check) => check.field === "expiry_date") && (
-                    <p>
-                      <strong>Printed package expiry: </strong>
-                      {verification.checks.find((check) => check.field === "expiry_date")!.explanation}
-                    </p>
-                  )}
-                  <p>
-                    Interpret this result alongside the listed registry and safety-alert
-                    evidence. A matching registration number alone cannot establish
-                    that the physical medicine package is authentic.
-                  </p>
                 </div>
 
               </section>

@@ -7,3 +7,4 @@ httpx
 google-genai
 python-multipart
 Pillow
+python-dotenv>=1.0.1,<2.0

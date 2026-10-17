@@ -11,6 +11,8 @@ from app.verifier import check_package_expiry
         ("16-10-2026", date(2026, 10, 17), "mismatch"),
         ("18-10-2026", date(2026, 10, 17), "match"),
         ("10/2026", date(2026, 10, 17), "match"),
+        ("10/28", date(2026, 10, 17), "match"),
+        ("10/25", date(2026, 10, 17), "mismatch"),
         ("09/2026", date(2026, 10, 17), "mismatch"),
         ("2026-10-16", date(2026, 10, 17), "mismatch"),
         ("2026-10-18", date(2026, 10, 17), "match"),
