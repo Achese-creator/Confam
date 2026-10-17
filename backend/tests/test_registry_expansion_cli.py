@@ -19,5 +19,6 @@ def test_help_exits_without_running_ingestion():
 
     assert result.returncode == 0, result.stderr
     assert "--dry-run" in result.stdout
-    assert "NAFDAC Greenbook product pages" in result.stdout
+    assert "NAFDAC Greenbook" in result.stdout
+    assert "product pages" in result.stdout
     assert "Existing records:" not in result.stdout

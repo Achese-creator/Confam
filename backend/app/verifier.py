@@ -26,6 +26,38 @@ def normalize_registration_number(value: str | None) -> str:
     return normalize(value)
 
 
+_PRODUCT_FORM_SUFFIXES = (
+    "tablets", "tablet", "capsules", "capsule", "caplets", "caplet",
+    "syrups", "syrup", "suspensions", "suspension",
+    "solutions", "solution", "injections", "injection",
+    "drops", "cream", "ointment", "gel", "powder",
+)
+
+
+def normalize_product_name(value: str | None) -> str:
+    """Normalize a product name and remove a generic trailing dosage form."""
+    normalized = normalize(value)
+    for suffix in _PRODUCT_FORM_SUFFIXES:
+        if normalized.endswith(suffix) and len(normalized) > len(suffix):
+            normalized = normalized[:-len(suffix)]
+            break
+    return normalized
+
+
+def normalize_manufacturer(value: str | None) -> str:
+    """Ignore punctuation and common legal suffixes in manufacturer names."""
+    normalized = normalize(value)
+    legal_suffixes = (
+        "privatelimited", "pvtltd", "incorporated", "limited",
+        "ltd", "plc", "llc", "inc",
+    )
+    for suffix in legal_suffixes:
+        if normalized.endswith(suffix) and len(normalized) > len(suffix):
+            normalized = normalized[:-len(suffix)]
+            break
+    return normalized
+
+
 def normalize_strength(value: str | None) -> str:
     """Normalize strength formatting while preserving numeric meaning."""
     if not value:
@@ -63,6 +95,11 @@ def compare_text(
             normalize_strength(package_value)
             == normalize_strength(reference_value)
         )
+    elif field == "manufacturer":
+        values_match = (
+            normalize_manufacturer(package_value)
+            == normalize_manufacturer(reference_value)
+        )
     else:
         values_match = normalize(package_value) == normalize(reference_value)
 
@@ -97,10 +134,9 @@ def compare_product_name(
             explanation="The product name is missing from one or both sources.",
         )
 
-    similarity = ratio(
-        normalize(package_value),
-        normalize(reference_value),
-    )
+    package_normalized = normalize_product_name(package_value)
+    reference_normalized = normalize_product_name(reference_value)
+    similarity = ratio(package_normalized, reference_normalized)
 
     if similarity >= 85:
         outcome = "match"
@@ -235,6 +271,92 @@ def check_expiry(
         ),
     )
 
+
+def check_package_expiry(
+    value: str | None,
+    today: date | None = None,
+) -> FieldCheck:
+    """Assess printed package expiry independently of registration expiry.
+
+    Supports DD-MM-YYYY, MM/YYYY, and ISO YYYY-MM-DD.
+    Month/year expiry remains valid through the final day of that month.
+    This check does not establish authenticity.
+    """
+    current_date = today or date.today()
+
+    if not value or not value.strip():
+        return FieldCheck(
+            field="expiry_date",
+            package_value=value,
+            reference_value=None,
+            outcome="not_checked",
+            check_scope="package_only",
+            explanation=(
+                "No readable package expiry date was supplied, so this "
+                "date could not be assessed."
+            ),
+        )
+
+    raw_value = value.strip()
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw_value):
+            expiry = date.fromisoformat(raw_value)
+        elif re.fullmatch(r"\d{2}-\d{2}-\d{4}", raw_value):
+            day, month, year = map(int, raw_value.split("-"))
+            expiry = date(year, month, day)
+        elif re.fullmatch(r"\d{2}/\d{4}", raw_value):
+            month, year = map(int, raw_value.split("/"))
+            expiry = date(year, month, monthrange(year, month)[1])
+        else:
+            raise ValueError("Unsupported expiry format")
+    except ValueError:
+        return FieldCheck(
+            field="expiry_date",
+            package_value=value,
+            reference_value=None,
+            outcome="not_checked",
+            check_scope="package_only",
+            explanation=(
+                "The printed expiry date could not be interpreted safely. "
+                "Check the original packaging with a pharmacist."
+            ),
+        )
+
+    if expiry < current_date:
+        return FieldCheck(
+            field="expiry_date",
+            package_value=value,
+            reference_value=None,
+            outcome="mismatch",
+            check_scope="package_only",
+            explanation=(
+                "The printed package expiry date has passed. Do not use this "
+                "product; consult a pharmacist or other qualified health "
+                "professional. This does not establish whether the product is counterfeit."
+            ),
+        )
+
+    if expiry == current_date and re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}", raw_value
+    ):
+        explanation = (
+            "The printed expiry date is today. Confirm the applicable expiry "
+            "convention with a pharmacist; this check does not establish authenticity."
+        )
+    else:
+        explanation = (
+            "The interpreted printed expiry date has not passed. This date "
+            "check does not establish product quality or authenticity."
+        )
+
+    return FieldCheck(
+        field="expiry_date",
+        package_value=value,
+        reference_value=None,
+        outcome="match",
+        check_scope="package_only",
+        explanation=explanation,
+    )
 
 def classify_alert_batch_expiry(
     value: str | None,
@@ -403,6 +525,12 @@ def verify_package(
         today=today,
     )
 
+    package_expiry_check = check_package_expiry(
+        claims.expiry_date,
+        today=today,
+    )
+    package_expired = package_expiry_check.outcome == "mismatch"
+
     supplied_number = normalize_registration_number(
         claims.nafdac_reg_number
     )
@@ -411,7 +539,7 @@ def verify_package(
         return VerificationResult(
             status=(
                 "high_risk_discrepancy_detected"
-                if _alert_warrants_high_risk(safety_alerts)
+                if package_expired or _alert_warrants_high_risk(safety_alerts)
                 else "verification_concern_detected"
             ),
             summary=(
@@ -431,6 +559,7 @@ def verify_package(
                 )
             ),
             matched_record=False,
+            checks=[package_expiry_check],
             safety_alerts=safety_alerts,
             limitations=[
                 "A safety-alert match is not proof that this individual package is affected.",
@@ -449,7 +578,7 @@ def verify_package(
         return VerificationResult(
             status=(
                 "high_risk_discrepancy_detected"
-                if _alert_warrants_high_risk(safety_alerts)
+                if package_expired or _alert_warrants_high_risk(safety_alerts)
                 else "verification_concern_detected"
             ),
             summary=(
@@ -457,6 +586,7 @@ def verify_package(
                 "number. The reference is ambiguous and needs manual review."
             ),
             matched_record=False,
+            checks=[],
             safety_alerts=safety_alerts,
             limitations=[
                 "The local dataset contains duplicate normalized registration numbers.",
@@ -491,6 +621,7 @@ def verify_package(
                 )
             ),
             matched_record=False,
+            checks=[package_expiry_check],
             safety_alerts=safety_alerts,
             limitations=[
                 "The local dataset may be incomplete or outdated.",
@@ -500,6 +631,7 @@ def verify_package(
         )
 
     checks = [
+        package_expiry_check,
         check_registration_status(reference),
         compare_product_name(claims.product_name, reference.product_name),
         compare_text(
@@ -539,15 +671,17 @@ def verify_package(
     )
     product_similarity = (
         ratio(
-            normalize(product_check.package_value),
-            normalize(product_check.reference_value),
+            normalize_product_name(product_check.package_value),
+            normalize_product_name(product_check.reference_value),
         )
         if product_check.package_value and product_check.reference_value
         else None
     )
 
-    high_risk = bool(mismatches & high_risk_fields) or (
-        product_similarity is not None and product_similarity < 65
+    high_risk = (
+        bool(mismatches & high_risk_fields)
+        or (product_similarity is not None and product_similarity < 65)
+        or package_expired
     )
 
     if high_risk:
@@ -561,7 +695,10 @@ def verify_package(
         mismatches
         or any(
             check.outcome == "not_checked"
-            and check.check_scope != "registry_record_only"
+            and check.check_scope not in {
+                "registry_record_only",
+                "package_only",
+            }
             for check in checks
         )
         or any(
@@ -609,13 +746,21 @@ def verify_package(
                 "regulatory verification. This does not prove the contents "
                 "of the individual package."
             )
-        elif status == "no_significant_discrepancy_detected":
+        elif status != "high_risk_discrepancy_detected":
             status = "verification_concern_detected"
             summary = (
                 "A product-level safety alert is relevant, but the reported "
                 "batch has not been confirmed. Review the original notice. "
                 "This does not prove that the individual package is affected."
             )
+
+    if package_expired:
+        summary = (
+            summary
+            + " The printed package expiry date has passed; do not use this "
+            "product and consult a pharmacist or other qualified health professional. "
+            "This is not, by itself, proof of counterfeiting."
+        )
 
     limitations = [
         "A registration-number match does not prove package authenticity.",

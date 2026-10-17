@@ -21,7 +21,7 @@ type VerificationCheck = {
   reference_value: string | null;
   outcome: "match" | "mismatch" | "not_checked";
   explanation: string;
-  check_scope: "package_vs_registry" | "registry_record_only";
+  check_scope: "package_vs_registry" | "registry_record_only" | "package_only";
 };
 
 type VerificationAlert = {
@@ -52,6 +52,14 @@ type VerificationResult = {
   source_name: string | null;
   source_url: string | null;
   dataset_label: string | null;
+  limitations: string[];
+};
+
+type PackageExtractionResponse = {
+  claims: Partial<Record<keyof PackageClaimsInput, string | null>>;
+  uncertain_fields: string[];
+  model_name: string;
+  review_required: true;
   limitations: string[];
 };
 
@@ -150,6 +158,12 @@ function App() {
   const [verification, setVerification] = useState<VerificationResult | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [verificationError, setVerificationError] = useState("");
+  const [packageImage, setPackageImage] = useState<File | null>(null);
+  const [extractionLoading, setExtractionLoading] = useState(false);
+  const [extractionError, setExtractionError] = useState("");
+  const [uncertainFields, setUncertainFields] = useState<string[]>([]);
+  const [extractionModel, setExtractionModel] = useState("");
+  const [extractionLimitations, setExtractionLimitations] = useState<string[]>([]);
 
   useEffect(() => {
     if (view !== "alerts") return;
@@ -234,6 +248,71 @@ function App() {
     } finally {
       setVerificationLoading(false);
     }
+  }
+
+  async function extractPackageImage() {
+    if (!packageImage || extractionLoading) return;
+
+    setExtractionLoading(true);
+    setExtractionError("");
+    setVerification(null);
+    setVerificationError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("image", packageImage);
+
+      const response = await fetch("/api/v1/extract", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { detail?: unknown }
+          | null;
+        const detail =
+          typeof body?.detail === "string"
+            ? body.detail
+            : `The API returned HTTP ${response.status}.`;
+        throw new Error(detail);
+      }
+
+      const result: PackageExtractionResponse = await response.json();
+
+      // Only non-empty extracted values replace existing form values.
+      // Missing or unreadable fields do not erase information already entered.
+      setClaims((current) => {
+        const updated = { ...current };
+
+        for (const field of Object.keys(emptyClaims) as (keyof PackageClaimsInput)[]) {
+          const value = result.claims[field];
+          if (typeof value === "string" && value.trim()) {
+            updated[field] = value.trim();
+          }
+        }
+
+        return updated;
+      });
+
+      setUncertainFields(result.uncertain_fields);
+      setExtractionModel(result.model_name);
+      setExtractionLimitations(result.limitations);
+    } catch (error) {
+      setExtractionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to extract package details from this image.",
+      );
+    } finally {
+      setExtractionLoading(false);
+    }
+  }
+
+  function uncertaintyBadge(field: keyof PackageClaimsInput) {
+    return uncertainFields.includes(field) ? (
+      <span className="extraction-uncertain">Review carefully</span>
+    ) : null;
   }
 
   function updateClaim(field: keyof PackageClaimsInput, value: string) {
@@ -367,9 +446,129 @@ function App() {
                 <p>Enter the details as printed. Leave unknown fields blank.</p>
               </div>
 
+              <div className="upload-panel image-upload-panel">
+                <div className="upload-symbol">↑</div>
+                <h2>Package image analysis</h2>
+                <p>
+                  Choose a clear photo of the medicine packaging. Extracted
+                  details will populate the fields below for your review.
+                  Unreadable fields are left unchanged.
+                </p>
+
+                <input
+                  className="image-file-input"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  aria-label="Choose a medicine package image"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0] ?? null;
+
+                    setExtractionError("");
+                    setVerification(null);
+                    setVerificationError("");
+                    setUncertainFields([]);
+                    setExtractionModel("");
+                    setExtractionLimitations([]);
+
+                    if (!file) {
+                      setPackageImage(null);
+                      return;
+                    }
+
+                    const supportedTypes = [
+                      "image/png",
+                      "image/jpeg",
+                      "image/webp",
+                    ];
+
+                    if (!supportedTypes.includes(file.type)) {
+                      setPackageImage(null);
+                      setExtractionError(
+                        "Choose a PNG, JPEG, or WebP image.",
+                      );
+                      event.currentTarget.value = "";
+                      return;
+                    }
+
+                    if (file.size > 5 * 1024 * 1024) {
+                      setPackageImage(null);
+                      setExtractionError(
+                        "The image exceeds the 5 MB upload limit.",
+                      );
+                      event.currentTarget.value = "";
+                      return;
+                    }
+
+                    setPackageImage(file);
+                  }}
+                />
+
+                {packageImage && (
+                  <p className="selected-image-name">
+                    Selected: <strong>{packageImage.name}</strong>
+                  </p>
+                )}
+
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!packageImage || extractionLoading}
+                  onClick={() => void extractPackageImage()}
+                >
+                  {extractionLoading
+                    ? "Reading package image…"
+                    : "Extract package details"}
+                  {!extractionLoading && <span>↑</span>}
+                </button>
+
+                {extractionError && (
+                  <p className="extraction-error" role="alert">
+                    {extractionError}
+                  </p>
+                )}
+              </div>
+
+              {extractionModel && (
+                <div className="extraction-review-note" role="status">
+                  <div className="extraction-review-heading">
+                    <strong>Review extracted claims</strong>
+                    <span className="coming-soon">REVIEW REQUIRED</span>
+                  </div>
+                  <p>
+                    Extractor: <strong>{extractionModel}</strong>
+                  </p>
+
+                  {uncertainFields.length > 0 ? (
+                    <p>
+                      Pay particular attention to:{" "}
+                      <strong>
+                        {uncertainFields
+                          .map((field) => fieldLabels[field] || field.replaceAll("_", " "))
+                          .join(", ")}
+                      </strong>
+                    </p>
+                  ) : (
+                    <p>
+                      No fields were explicitly flagged as uncertain. Still
+                      review every extracted value against the package.
+                    </p>
+                  )}
+
+                  <ul>
+                    {extractionLimitations.map((limitation, index) => (
+                      <li key={`${index}-${limitation}`}>{limitation}</li>
+                    ))}
+                  </ul>
+                  <p>
+                    Correct any mistakes in the fields below before comparing
+                    the claims with available evidence.
+                  </p>
+                </div>
+              )}
+
               <div className="claims-grid">
                 <label className="claim-field">
-                  Product name <span className="required-mark">Required</span>
+                  Product name {uncertaintyBadge("product_name")} <span className="required-mark">Required</span>
                   <input
                     name="product_name"
                     value={claims.product_name}
@@ -380,7 +579,7 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  NAFDAC registration number <span className="required-mark">Required</span>
+                  NAFDAC registration number {uncertaintyBadge("nafdac_reg_number")} <span className="required-mark">Required</span>
                   <input
                     name="nafdac_reg_number"
                     value={claims.nafdac_reg_number}
@@ -391,7 +590,7 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  Active ingredients
+                  Active ingredients {uncertaintyBadge("active_ingredients")}
                   <input
                     name="active_ingredients"
                     value={claims.active_ingredients}
@@ -401,7 +600,7 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  Strength
+                  Strength {uncertaintyBadge("strength")}
                   <input
                     name="strength"
                     value={claims.strength}
@@ -411,7 +610,7 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  Dosage form
+                  Dosage form {uncertaintyBadge("dosage_form")}
                   <input
                     name="dosage_form"
                     value={claims.dosage_form}
@@ -421,7 +620,7 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  Manufacturer
+                  Manufacturer {uncertaintyBadge("manufacturer")}
                   <input
                     name="manufacturer"
                     value={claims.manufacturer}
@@ -431,7 +630,7 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  Batch number
+                  Batch number {uncertaintyBadge("batch_number")}
                   <input
                     name="batch_number"
                     value={claims.batch_number}
@@ -441,7 +640,7 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  Manufacturing date
+                  Manufacturing date {uncertaintyBadge("manufacturing_date")}
                   <input
                     name="manufacturing_date"
                     value={claims.manufacturing_date}
@@ -451,7 +650,7 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  Package expiry date
+                  Package expiry date {uncertaintyBadge("expiry_date")}
                   <input
                     name="expiry_date"
                     value={claims.expiry_date}
@@ -462,10 +661,9 @@ function App() {
               </div>
 
               <p className="form-scope-note">
-                Current engine limitation: batch and package dates are collected
-                but are not compared with registry fields. A batch number may
-                help identify a relevant safety alert. Registration expiry is a
-                separate registry-record check.
+                Package expiry is assessed independently from registration expiry.
+                Batch numbers may help identify relevant safety alerts, but a
+                package date is not a registry comparison or proof of authenticity.
               </p>
 
               <button className="primary-button" type="submit" disabled={verificationLoading}>
@@ -550,6 +748,9 @@ function App() {
                         {check.check_scope === "registry_record_only" && (
                           <p className="check-scope-label">Registry record check — not a package-label comparison</p>
                         )}
+                        {check.check_scope === "package_only" && (
+                          <p className="check-scope-label">Package-only check — assessed independently; not compared with the registry</p>
+                        )}
                       </article>
                     ))}
                   </div>
@@ -615,6 +816,22 @@ function App() {
                 >
                   Start a new check
                 </button>
+                <div className="result-briefing">
+                  <h3>Evidence briefing</h3>
+                  <p>{verification.summary}</p>
+                  {verification.checks.find((check) => check.field === "expiry_date") && (
+                    <p>
+                      <strong>Printed package expiry: </strong>
+                      {verification.checks.find((check) => check.field === "expiry_date")!.explanation}
+                    </p>
+                  )}
+                  <p>
+                    Interpret this result alongside the listed registry and safety-alert
+                    evidence. A matching registration number alone cannot establish
+                    that the physical medicine package is authentic.
+                  </p>
+                </div>
+
               </section>
             )}
 
@@ -626,13 +843,6 @@ function App() {
                 chemical composition, contamination, or physical authenticity
                 and is not an official NAFDAC verdict.
               </p>
-            </div>
-
-            <div className="upload-panel">
-              <div className="upload-symbol">↑</div>
-              <h2>Package image analysis</h2>
-              <p>Image extraction is not connected yet. Enter package details manually for now.</p>
-              <span className="coming-soon">IMAGE EXTRACTION NOT CONFIGURED</span>
             </div>
 
             <button className="text-button" onClick={() => setView("overview")}>← Back to overview</button>

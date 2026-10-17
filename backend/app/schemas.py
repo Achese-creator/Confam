@@ -45,6 +45,7 @@ class FieldCheck(BaseModel):
     check_scope: Literal[
         "package_vs_registry",
         "registry_record_only",
+        "package_only",
     ] = "package_vs_registry"
 
 

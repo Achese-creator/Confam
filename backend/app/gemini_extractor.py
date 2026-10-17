@@ -1,6 +1,7 @@
 """Gemini implementation of the package-image extraction interface."""
 
 import json
+import logging
 import os
 
 from app.extraction import (
@@ -8,6 +9,9 @@ from app.extraction import (
     build_extraction_result,
 )
 from app.schemas import PackageClaims, PackageExtractionResult
+
+
+logger = logging.getLogger(__name__)
 
 
 EXTRACTION_PROMPT = """
@@ -33,7 +37,7 @@ class GeminiPackageImageExtractor:
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self.model_name = model_name or os.getenv(
             "CONFAM_GEMINI_MODEL",
-            "gemini-2.5-flash-lite",
+            "gemini-3.5-flash-lite",
         )
 
     def extract(
@@ -97,7 +101,12 @@ class GeminiPackageImageExtractor:
                 "The vision provider returned unusable extraction data."
             ) from exc
         except Exception as exc:
-            # Avoid exposing provider internals, credentials, or raw responses.
+            # Keep diagnostics in backend logs; never expose them to the client.
+            logger.exception(
+                "Gemini package extraction failed (%s): %s",
+                type(exc).__name__,
+                str(exc),
+            )
             raise ExtractionProviderError(
                 "Image extraction failed. Please try again later."
             ) from exc

@@ -569,3 +569,122 @@ button:focus-visible, a:focus-visible { outline: 3px solid #5bbab2; outline-offs
     flex-direction: column;
   }
 }
+
+
+/* Package image extraction — follows the existing CONFAM visual system */
+.image-upload-panel {
+  width: 100%;
+  margin: 0 0 22px;
+}
+
+.image-file-input {
+  display: block;
+  width: min(100%, 390px);
+  color: #506777;
+  font: 11px 'DM Sans', sans-serif;
+  text-align: left;
+}
+
+.image-file-input::file-selector-button {
+  margin-right: 10px;
+  padding: 9px 12px;
+  border: 1px solid #d7e5eb;
+  border-radius: 6px;
+  background: #f3f8fa;
+  color: #274c5e;
+  font: 600 11px 'DM Sans', sans-serif;
+  cursor: pointer;
+}
+
+.selected-image-name {
+  overflow-wrap: anywhere;
+  margin-top: 12px !important;
+  margin-bottom: 0 !important;
+}
+
+.image-upload-panel .primary-button {
+  margin-top: 15px;
+}
+
+.primary-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.extraction-error {
+  max-width: 480px !important;
+  margin: 15px 0 0 !important;
+  color: #a33e36 !important;
+}
+
+.extraction-review-note {
+  margin: 0 0 22px;
+  padding: 17px 19px;
+  border: 1px solid #d7e5eb;
+  border-radius: 10px;
+  background: #f3f8fa;
+  color: #506777;
+  font-size: 11px;
+  line-height: 1.75;
+}
+
+.extraction-review-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.extraction-review-heading > strong {
+  color: #123b50;
+  font-size: 13px;
+}
+
+.extraction-review-note p {
+  margin: 8px 0;
+}
+
+.extraction-review-note ul {
+  padding-left: 19px;
+  margin: 10px 0;
+}
+
+.extraction-uncertain {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #fff0e5;
+  color: #9b5a2c;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+
+/* Final evidence briefing at the end of a verification report. */
+.result-briefing {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #d7e1e8);
+  border-radius: 12px;
+  background: var(--surface-muted, #f7fafc);
+}
+
+.result-briefing h3 {
+  margin-top: 0;
+  margin-bottom: 0.65rem;
+}
+
+.result-briefing p:last-child {
+  margin-bottom: 0;
+}
+
+.check-scope-label {
+  margin-top: 0.65rem;
+  font-size: 0.875rem;
+  color: var(--text-muted, #526675);
+}
