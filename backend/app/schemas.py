@@ -18,7 +18,7 @@ class PackageClaims(BaseModel):
 
 
 class RegistryRecord(BaseModel):
-    """A registration record from our local evidence dataset."""
+    """A registration record returned by a regulatory evidence source."""
 
     product_name: str
     active_ingredients: str | None = None
@@ -31,7 +31,16 @@ class RegistryRecord(BaseModel):
     source_name: str
     source_url: str
     retrieved_at: str
-    dataset_label: Literal["synthetic_test_fixture", "curated_source_record"]
+    dataset_label: Literal[
+        "synthetic_test_fixture",
+        "curated_source_record",
+        "live_source_record",
+    ]
+    applicant_name: str | None = None
+    composition: str | None = None
+    route: str | None = None
+    pack_size: str | None = None
+    approval_date: str | None = None
 
 
 class FieldCheck(BaseModel):
@@ -110,6 +119,10 @@ class VerificationResult(BaseModel):
     briefing: str | None = None
     matched_record: bool
     registry_snapshot_retrieved_at: str | None = None
+    registry_lookup_status: Literal[
+        "match", "not_found", "unavailable", "not_searched"
+    ] = "not_searched"
+    registry_retrieved_at: str | None = None
     alerts_snapshot_retrieved_at: str | None = None
     checks: list[FieldCheck] = Field(default_factory=list)
     safety_alerts: list[SafetyAlertEvidence] = Field(default_factory=list)

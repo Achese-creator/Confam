@@ -47,6 +47,8 @@ type VerificationResult = {
   briefing?: string | null;
   matched_record: boolean;
   registry_snapshot_retrieved_at: string | null;
+  registry_lookup_status: "match" | "not_found" | "unavailable" | "not_searched";
+  registry_retrieved_at: string | null;
   alerts_snapshot_retrieved_at: string | null;
   checks: VerificationCheck[];
   safety_alerts: VerificationAlert[];
@@ -765,13 +767,24 @@ function App() {
 
                 <div className="result-meta">
                   <span>
-                    Registry record: <strong>{verification.matched_record ? "Found" : "Not found"}</strong>
+                    Greenbook lookup:{" "}
+                    <strong>
+                      {verification.registry_lookup_status === "match"
+                        ? "Exact registration match"
+                        : verification.registry_lookup_status === "not_found"
+                          ? "No exact match found"
+                          : verification.registry_lookup_status === "unavailable"
+                            ? "Source unavailable"
+                            : "Not performed"}
+                    </strong>
                   </span>
                   <span>
-                    Registry snapshot: <strong>{verification.registry_snapshot_retrieved_at || "Unknown"}</strong>
+                    Live lookup retrieved:{" "}
+                    <strong>{verification.registry_retrieved_at || "Not available"}</strong>
                   </span>
                   <span>
-                    Alert snapshot: <strong>{verification.alerts_snapshot_retrieved_at || "Unknown"}</strong>
+                    Safety-alert snapshot:{" "}
+                    <strong>{verification.alerts_snapshot_retrieved_at || "Unknown"}</strong>
                   </span>
                 </div>
 

@@ -12,6 +12,7 @@ from app.schemas import (
     PackageExtractionResult,
 )
 from app.verifier import verify_package
+from app.greenbook_client import GreenbookClient, GREENBOOK_URL
 from app.extraction import ExtractionProviderError
 from app.gemini_extractor import GeminiPackageImageExtractor
 from app.gemini_briefing import generate_evidence_briefing
@@ -86,21 +87,13 @@ def health_check():
 
 @app.get("/api/v1/registry", response_model=RegistryMetadata)
 def registry_metadata():
-    labels = {record.dataset_label for record in REGISTRY_RECORDS}
-
-    dataset_label = (
-        next(iter(labels))
-        if len(labels) == 1
-        else "mixed_sources"
-    )
-
     return RegistryMetadata(
-        dataset_label=dataset_label,
-        record_count=len(REGISTRY_RECORDS),
+        dataset_label="live_lookup",
+        record_count=0,
         source_note=(
-            f"Versioned snapshot retrieved on "
-            f"{REGISTRY_DATA['retrieved_at']}. "
-            "The dataset may be incomplete or outdated. "
+            "CONFAM queries the NAFDAC Greenbook for each verification "
+            "that includes a registration number. No complete local copy "
+            "of the Greenbook is treated as the current registry source. "
             "A matching record does not prove package authenticity."
         ),
     )
@@ -128,17 +121,90 @@ def list_alert_records():
 
 @app.post("/api/v1/verify", response_model=VerificationResult)
 def verify(request: VerifyRequest):
+    claims = request.claims
+    registration_number = (claims.nafdac_reg_number or "").strip()
+
+    lookup_status = "not_searched"
+    live_record = None
+    registry_retrieved_at = None
+    lookup_message = None
+
+    if registration_number:
+        lookup = GreenbookClient().lookup(registration_number)
+        lookup_status = lookup.status
+        lookup_message = lookup.message
+
+        if lookup.status == "match" and lookup.record is not None:
+            live_record = RegistryRecord.model_validate(lookup.record)
+            registry_retrieved_at = live_record.retrieved_at
+
+    # Registry comparisons use only an exact live Greenbook match.
+    # The local registry snapshot is not used as a fallback.
     result = verify_package(
-        request.claims,
-        REGISTRY_RECORDS,
+        claims,
+        [live_record] if live_record is not None else [],
         alert_records=ALERT_RECORDS,
     )
-    result = result.model_copy(
-        update={
-            "registry_snapshot_retrieved_at": REGISTRY_DATA["retrieved_at"],
-            "alerts_snapshot_retrieved_at": ALERT_DATA["retrieved_at"],
-        }
-    )
+
+    updates = {
+        "registry_snapshot_retrieved_at": None,
+        "registry_lookup_status": lookup_status,
+        "registry_retrieved_at": registry_retrieved_at,
+        "alerts_snapshot_retrieved_at": ALERT_DATA["retrieved_at"],
+    }
+
+    if live_record is not None:
+        updates.update({
+            "source_name": live_record.source_name,
+            "source_url": live_record.source_url,
+            "dataset_label": "live_source_record",
+        })
+    elif lookup_status == "not_found":
+        updates.update({
+            "source_name": "NAFDAC Greenbook",
+            "source_url": GREENBOOK_URL,
+            "dataset_label": "live_lookup",
+            "summary": (
+                "No exact match for this registration number was found "
+                "in the live NAFDAC Greenbook lookup. This is not proof "
+                "of counterfeiting."
+            ),
+            "limitations": list(result.limitations) + [
+                "No exact live Greenbook registration match was available "
+                "for comparison."
+            ],
+        })
+        if result.status != "high_risk_discrepancy_detected":
+            updates["status"] = "verification_concern_detected"
+    elif lookup_status == "unavailable":
+        updates.update({
+            "source_name": "NAFDAC Greenbook",
+            "source_url": GREENBOOK_URL,
+            "dataset_label": "live_lookup",
+            "summary": (
+                "The live NAFDAC Greenbook could not be reached, so the "
+                "registration could not be checked. This is not evidence "
+                "that the medicine is counterfeit."
+            ),
+            "limitations": list(result.limitations) + [
+                "Live registry comparison was unavailable; no local "
+                "registry fallback was used."
+            ],
+        })
+        if result.status != "high_risk_discrepancy_detected":
+            updates["status"] = "verification_concern_detected"
+    else:
+        updates["limitations"] = list(result.limitations) + [
+            "No registration number was supplied, so no live Greenbook "
+            "lookup was performed."
+        ]
+
+    if lookup_message and lookup_status in {"not_found", "unavailable"}:
+        updates["limitations"] = list(updates.get(
+            "limitations", result.limitations
+        )) + [lookup_message]
+
+    result = result.model_copy(update=updates)
     return result.model_copy(
         update={"briefing": generate_evidence_briefing(result)}
     )
