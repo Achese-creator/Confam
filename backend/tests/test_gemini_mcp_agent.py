@@ -150,6 +150,7 @@ def test_gemini_tool_call_uses_mcp_session():
         "tools_called": ["get_relevant_safety_alerts"],
         "tool_call_count": 1,
         "tool_errors": 0,
+        "tool_errors_by_name": [],
     }
     assert "No matching alert" in answer
     assert client.models.generate_content.call_count == 2
