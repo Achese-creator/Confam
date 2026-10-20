@@ -870,3 +870,124 @@ button:focus-visible, a:focus-visible { outline: 3px solid #5bbab2; outline-offs
     min-height: 46px;
   }
 }
+
+
+/* Ask CONFAM evidence assistant */
+.assistant-page { max-width: 980px; }
+.assistant-form,
+.assistant-result {
+  margin-top: 25px;
+  padding: 24px;
+  border: 1px solid #dce6e9;
+  border-radius: 12px;
+  background: #fff;
+}
+.assistant-form label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--navy-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+.assistant-form textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid #cbdadd;
+  border-radius: 8px;
+  color: var(--navy-dark);
+  background: #fbfdfd;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+}
+.assistant-form textarea:focus {
+  outline: 2px solid #79bdb5;
+  outline-offset: 1px;
+}
+.assistant-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 15px;
+}
+.assistant-form-footer > span,
+.assistant-loading {
+  color: #607783;
+  font-size: 12px;
+}
+.assistant-result h2 {
+  margin: 10px 0 18px;
+  color: var(--navy-dark);
+  font-size: 22px;
+}
+.assistant-answer {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #29434f;
+  font-size: 13px;
+  line-height: 1.85;
+}
+.assistant-trace {
+  margin-top: 25px;
+  padding: 18px;
+  border-radius: 9px;
+  background: #f3f8f8;
+}
+.assistant-trace h3 {
+  margin: 0 0 14px;
+  color: var(--navy-dark);
+  font-size: 14px;
+}
+.assistant-trace-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+}
+.assistant-trace-stats div {
+  display: grid;
+  gap: 4px;
+}
+.assistant-trace-stats strong {
+  color: var(--navy-dark);
+  font-size: 24px;
+}
+.assistant-trace-stats span,
+.assistant-trace p {
+  color: #607783;
+  font-size: 11px;
+}
+.assistant-trace ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 16px 0 0;
+  list-style: none;
+}
+.assistant-trace li code {
+  display: inline-block;
+  padding: 6px 9px;
+  border: 1px solid #d5e3e4;
+  border-radius: 6px;
+  background: #fff;
+  color: #17475a;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.assistant-disclaimer {
+  margin: 20px 0 0;
+  color: #607783;
+  font-size: 11px;
+  line-height: 1.7;
+}
+@media (max-width: 600px) {
+  .assistant-form,
+  .assistant-result { padding: 16px; }
+  .assistant-form-footer { align-items: stretch; flex-direction: column; }
+  .assistant-form-footer .primary-button { justify-content: center; }
+}

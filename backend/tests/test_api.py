@@ -71,16 +71,17 @@ def test_health_endpoint():
     assert response.json()["status"] == "ok"
 
 
-def test_registry_metadata_reports_live_lookup():
+def test_registry_metadata_reports_live_lookup_with_curated_fallback():
     response = client.get("/api/v1/registry")
 
     assert response.status_code == 200
     data = response.json()
 
-    assert data["dataset_label"] == "live_lookup"
-    assert data["record_count"] == 0
-    assert "for each verification" in data["source_note"].lower()
-    assert "no complete local copy" in data["source_note"].lower()
+    assert data["dataset_label"] == "live_lookup_with_curated_fallback"
+    assert data["record_count"] > 0
+    assert "live nafdac greenbook first" in data["source_note"].lower()
+    assert "snapshot" in data["source_note"].lower()
+    assert "outdated" in data["source_note"].lower()
 
 
 def test_live_registry_record_can_be_checked():
@@ -126,7 +127,9 @@ def test_unknown_number_is_not_called_fake():
 
     assert data["matched_record"] is False
     assert data["status"] == "verification_concern_detected"
-    assert "not proof of counterfeiting" in data["summary"].lower()
+    summary = data["summary"].lower()
+    assert "does not prove" in summary
+    assert "counterfeit" in summary
 
 
 def test_unavailable_greenbook_is_not_called_counterfeit(monkeypatch):
@@ -155,11 +158,20 @@ def test_unavailable_greenbook_is_not_called_counterfeit(monkeypatch):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["matched_record"] is False
+
+    # Live lookup failed, but the exact NRN exists in the curated snapshot.
+    assert data["matched_record"] is True
     assert data["registry_lookup_status"] == "unavailable"
-    assert data["status"] == "verification_concern_detected"
-    assert "could not be reached" in data["summary"].lower()
-    assert "not evidence" in data["summary"].lower()
+    assert data["dataset_label"] == "curated_source_record"
+    assert data["registry_retrieved_at"] is None
+    assert data["registry_snapshot_retrieved_at"] is not None
+    assert data["status"] == "high_risk_discrepancy_detected"
+
+    summary = data["summary"].lower()
+    assert "live nafdac greenbook lookup" in summary
+    assert "did not" in summary
+    assert "snapshot" in summary or "curated" in summary
+    assert "not confirmation of current registration" in summary
 
 
 def test_alert_metadata_reports_curated_snapshot():

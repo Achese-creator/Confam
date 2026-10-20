@@ -117,6 +117,7 @@ class VerificationResult(BaseModel):
     ]
     summary: str
     briefing: str | None = None
+    semantic_reconciliation: str | None = None
     matched_record: bool
     registry_snapshot_retrieved_at: str | None = None
     registry_lookup_status: Literal[
@@ -128,6 +129,10 @@ class VerificationResult(BaseModel):
     safety_alerts: list[SafetyAlertEvidence] = Field(default_factory=list)
     source_name: str | None = None
     source_url: str | None = None
+    registry_applicant_name: str | None = None
+    registry_manufacturer: str | None = None
+    registry_registration_status: str | None = None
+    registry_registration_expiry_date: str | None = None
     dataset_label: str | None = None
     limitations: list[str] = Field(default_factory=list)
 

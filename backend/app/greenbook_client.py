@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime, timezone
 from html import unescape
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from rapidfuzz.fuzz import ratio
 
 
 GREENBOOK_URL = "https://greenbook.nafdac.gov.ng/"
@@ -27,9 +29,23 @@ class GreenbookLookupResult:
     message: str | None = None
 
 
+@dataclass(frozen=True)
+class GreenbookProductSearchResult:
+    status: str
+    candidates: list[dict] | None = None
+    message: str | None = None
+
+
 def normalize_registration_number(value: object) -> str:
     """Normalize punctuation and case without fuzzy-matching registration IDs."""
     return re.sub(r"[^a-zA-Z0-9]", "", str(value or "")).casefold()
+
+
+def normalize_product_name(value: object) -> str:
+    """Normalize product names for candidate ranking, never identity proof."""
+    text = _clean_text(value) or ""
+    text = re.sub(r"\s*#+\s*$", "", text)
+    return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
 
 
 def _clean_text(value: object) -> str | None:
@@ -100,12 +116,12 @@ class GreenbookClient:
         self.base_url = base_url
         self.timeout = timeout
 
-    def _fetch_rows(self, registration_number: str) -> list[dict]:
+    def _fetch_rows(self, search_term: str) -> list[dict]:
         params = {
             "draw": "1",
             "start": "0",
             "length": "25",
-            "search[value]": registration_number,
+            "search[value]": search_term,
             "search[regex]": "false",
         }
         url = f"{self.base_url}?{urlencode(params)}"
@@ -198,7 +214,7 @@ class GreenbookClient:
         try:
             record = _row_to_record(
                 exact_matches[0],
-                retrieved_at=date.today().isoformat(),
+                retrieved_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
             )
         except GreenbookUnavailable as exc:
             return GreenbookLookupResult(
@@ -211,3 +227,91 @@ class GreenbookClient:
             record=record,
             message="Exact registration-number match found in Greenbook.",
         )
+
+    def search_by_product_name(
+        self,
+        product_name: str,
+        limit: int = 10,
+    ) -> GreenbookProductSearchResult:
+        """Discover ranked product-name candidates; do not certify identity."""
+        query = normalize_product_name(product_name)
+        if not query:
+            return GreenbookProductSearchResult(
+                status="not_found",
+                candidates=[],
+                message="No product name was supplied.",
+            )
+
+        limit = max(1, min(limit, 10))
+
+        try:
+            rows = self._fetch_rows(product_name.strip())
+        except GreenbookUnavailable as exc:
+            return GreenbookProductSearchResult(
+                status="unavailable",
+                candidates=[],
+                message=str(exc),
+            )
+
+        ranked = []
+        invalid_rows = 0
+        retrieved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+        for row in rows:
+            try:
+                record = _row_to_record(row, retrieved_at)
+            except GreenbookUnavailable:
+                invalid_rows += 1
+                continue
+
+            candidate_name = normalize_product_name(record["product_name"])
+            if not candidate_name:
+                continue
+
+            score = round(ratio(query, candidate_name))
+            # Broad candidate discovery only. This threshold is not a
+            # confidence threshold and must not be used to verify a package.
+            if score >= 35:
+                ranked.append({
+                    "record": record,
+                    "similarity_score": score,
+                })
+
+        ranked.sort(
+            key=lambda item: (
+                item["similarity_score"],
+                item["record"]["product_name"].casefold(),
+            ),
+            reverse=True,
+        )
+
+        if not ranked:
+            if rows and invalid_rows == len(rows):
+                return GreenbookProductSearchResult(
+                    status="unavailable",
+                    candidates=[],
+                    message=(
+                        "Greenbook returned rows that could not be mapped "
+                        "to valid registry records."
+                    ),
+                )
+            return GreenbookProductSearchResult(
+                status="not_found",
+                candidates=[],
+                message=(
+                    "No usable product-name candidates were found in the "
+                    "Greenbook search results. This does not establish that "
+                    "a medicine is unregistered or counterfeit."
+                ),
+            )
+
+        return GreenbookProductSearchResult(
+            status="candidates_found",
+            candidates=ranked[:limit],
+            message=(
+                "Candidate records found. Similarity scores rank names only; "
+                "they do not establish product identity or authenticity. "
+                "Compare registration number and product details separately."
+            ),
+        )
+

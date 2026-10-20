@@ -94,6 +94,13 @@ def test_lookup_returns_exact_live_record():
     assert result.record["nafdac_reg_number"] == "A4-100160"
     assert result.record["source_name"] == "NAFDAC Greenbook"
 
+    retrieved_at = result.record["retrieved_at"]
+    assert "T" in retrieved_at
+    assert retrieved_at.endswith("+00:00")
+    retrieved_at = result.record["retrieved_at"]
+    assert "T" in retrieved_at
+    assert retrieved_at.endswith("+00:00")
+
 
 def test_lookup_marks_malformed_payload_unavailable():
     client = GreenbookClient()
@@ -119,3 +126,62 @@ def test_lookup_marks_network_failure_unavailable():
 
     assert result.status == "unavailable"
     assert result.record is None
+
+
+def test_product_name_search_returns_ranked_candidates():
+    payload = {
+        "data": [
+            sample_row(product_name="AG Spironolactone 25mg##"),
+            sample_row(
+                product_id=3,
+                product_name="Spironolactone Tablets",
+                NAFDAC="B1-123456",
+            ),
+            sample_row(
+                product_id=4,
+                product_name="Amoxicillin Capsules",
+                NAFDAC="C2-654321",
+            ),
+        ]
+    }
+    client = GreenbookClient()
+
+    with patch(
+        "app.greenbook_client.urlopen",
+        return_value=fake_response(payload),
+    ):
+        result = client.search_by_product_name("AG Spironolactone 25mg")
+
+    assert result.status == "candidates_found"
+    assert result.candidates
+    assert result.candidates[0]["record"]["product_name"] == (
+        "AG Spironolactone 25mg"
+    )
+    assert result.candidates[0]["similarity_score"] >= (
+        result.candidates[-1]["similarity_score"]
+    )
+    assert "do not establish product identity" in result.message
+
+
+def test_product_name_search_reports_unavailable_on_network_failure():
+    client = GreenbookClient()
+
+    with patch(
+        "app.greenbook_client.urlopen",
+        side_effect=OSError("network down"),
+    ):
+        result = client.search_by_product_name("Spironolactone")
+
+    assert result.status == "unavailable"
+    assert result.candidates == []
+
+
+def test_product_name_search_handles_empty_query_without_network_call():
+    client = GreenbookClient()
+
+    with patch("app.greenbook_client.urlopen") as mocked:
+        result = client.search_by_product_name("   ")
+
+    mocked.assert_not_called()
+    assert result.status == "not_found"
+    assert result.candidates == []
