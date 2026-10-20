@@ -29,6 +29,7 @@ def test_agent_endpoint_returns_answer(monkeypatch):
         "tools_called": ["search_greenbook_by_nrn"],
         "tool_call_count": 1,
         "tool_errors": 0,
+        "tool_errors_by_name": [],
     }
 
 
