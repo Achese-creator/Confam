@@ -209,3 +209,203 @@ def test_tool_call_loop_is_bounded():
     assert "tool-call limit" in answer.lower()
     assert client.models.generate_content.call_count == 2
     assert session.call_tool.await_count == 1
+
+
+def test_mcp_error_result_is_traced_by_tool_name():
+    from google.genai import types
+
+    session = MagicMock()
+    session.list_tools = AsyncMock(
+        return_value=SimpleNamespace(
+            tools=[
+                SimpleNamespace(
+                    name="get_relevant_safety_alerts",
+                    description="Retrieve relevant safety alerts.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "product_name": {"type": "string"}
+                        },
+                        "required": ["product_name"],
+                    },
+                )
+            ]
+        )
+    )
+    session.call_tool = AsyncMock(
+        return_value=SimpleNamespace(isError=True, content=[])
+    )
+
+    call_content = types.Content(
+        role="model",
+        parts=[
+            types.Part(
+                function_call=types.FunctionCall(
+                    name="get_relevant_safety_alerts",
+                    args={"product_name": "Example medicine"},
+                )
+            )
+        ],
+    )
+    final_content = types.Content(
+        role="model",
+        parts=[types.Part(text="The evidence tool failed; no conclusion can be drawn.")],
+    )
+    client = MagicMock()
+    client.models.generate_content.side_effect = [
+        SimpleNamespace(candidates=[SimpleNamespace(content=call_content)]),
+        SimpleNamespace(candidates=[SimpleNamespace(content=final_content)]),
+    ]
+    trace = {
+        "tools_called": [],
+        "tool_call_count": 0,
+        "tool_errors": 0,
+    }
+
+    answer = asyncio.run(
+        _run_with_session(
+            session, client, "Check safety alerts", trace=trace
+        )
+    )
+
+    assert session.call_tool.await_count == 1
+    assert trace == {
+        "tools_called": ["get_relevant_safety_alerts"],
+        "tool_call_count": 1,
+        "tool_errors": 1,
+        "tool_errors_by_name": ["get_relevant_safety_alerts"],
+    }
+    assert "no conclusion" in answer.lower()
+
+
+def test_mcp_exception_is_traced_by_tool_name():
+    from google.genai import types
+
+    session = MagicMock()
+    session.list_tools = AsyncMock(
+        return_value=SimpleNamespace(
+            tools=[
+                SimpleNamespace(
+                    name="search_greenbook_by_nrn",
+                    description="Look up an exact registration number.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "registration_number": {"type": "string"}
+                        },
+                        "required": ["registration_number"],
+                    },
+                )
+            ]
+        )
+    )
+    session.call_tool = AsyncMock(
+        side_effect=RuntimeError("simulated MCP failure")
+    )
+
+    call_content = types.Content(
+        role="model",
+        parts=[
+            types.Part(
+                function_call=types.FunctionCall(
+                    name="search_greenbook_by_nrn",
+                    args={"registration_number": "TEST-NRN"},
+                )
+            )
+        ],
+    )
+    final_content = types.Content(
+        role="model",
+        parts=[types.Part(text="The registry lookup failed; the result is unknown.")],
+    )
+    client = MagicMock()
+    client.models.generate_content.side_effect = [
+        SimpleNamespace(candidates=[SimpleNamespace(content=call_content)]),
+        SimpleNamespace(candidates=[SimpleNamespace(content=final_content)]),
+    ]
+    trace = {
+        "tools_called": [],
+        "tool_call_count": 0,
+        "tool_errors": 0,
+    }
+
+    answer = asyncio.run(
+        _run_with_session(
+            session, client, "Look up TEST-NRN", trace=trace
+        )
+    )
+
+    assert session.call_tool.await_count == 1
+    assert trace == {
+        "tools_called": ["search_greenbook_by_nrn"],
+        "tool_call_count": 1,
+        "tool_errors": 1,
+        "tool_errors_by_name": ["search_greenbook_by_nrn"],
+    }
+    assert "unknown" in answer.lower()
+
+
+def test_unregistered_tool_is_rejected_and_traced():
+    from google.genai import types
+
+    session = MagicMock()
+    session.list_tools = AsyncMock(
+        return_value=SimpleNamespace(
+            tools=[
+                SimpleNamespace(
+                    name="search_greenbook_by_nrn",
+                    description="Look up an exact registration number.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "registration_number": {"type": "string"}
+                        },
+                        "required": ["registration_number"],
+                    },
+                )
+            ]
+        )
+    )
+    session.call_tool = AsyncMock()
+
+    call_content = types.Content(
+        role="model",
+        parts=[
+            types.Part(
+                function_call=types.FunctionCall(
+                    name="delete_registry_records",
+                    args={"registration_number": "TEST-NRN"},
+                )
+            )
+        ],
+    )
+    final_content = types.Content(
+        role="model",
+        parts=[types.Part(text="That requested tool is unavailable.")],
+    )
+    client = MagicMock()
+    client.models.generate_content.side_effect = [
+        SimpleNamespace(candidates=[SimpleNamespace(content=call_content)]),
+        SimpleNamespace(candidates=[SimpleNamespace(content=final_content)]),
+    ]
+    trace = {
+        "tools_called": [],
+        "tool_call_count": 0,
+        "tool_errors": 0,
+    }
+
+    answer = asyncio.run(
+        _run_with_session(
+            session, client, "Check this medicine", trace=trace
+        )
+    )
+
+    session.call_tool.assert_not_awaited()
+    assert trace == {
+        "tools_called": [],
+        "tool_call_count": 1,
+        "tool_errors": 1,
+        "tool_errors_by_name": ["delete_registry_records"],
+    }
+    assert "unavailable" in answer.lower()
+
