@@ -1,8 +1,67 @@
+import pytest
 from fastapi.testclient import TestClient
 
+import app.main as main_module
+from app.greenbook_client import GreenbookLookupResult
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def mock_greenbook_lookup(monkeypatch):
+    """Keep API tests deterministic and independent of the live Greenbook."""
+    record = {
+        "product_name": "AG Spironolactone",
+        "active_ingredients": "Spironolactone",
+        "strength": "25 mg",
+        "dosage_form": "Tablet",
+        "nafdac_reg_number": "A4-100160",
+        "manufacturer": None,
+        "registration_status": "Active",
+        "registration_expiry_date": "2026-12-16",
+        "source_name": "NAFDAC Greenbook",
+        "source_url": "https://greenbook.nafdac.gov.ng/products/details/2",
+        "retrieved_at": "2026-10-19",
+        "dataset_label": "live_source_record",
+        "applicant_name": "AnnyGod Pharmaceutical Company Ltd",
+        "composition": (
+            "Each film coated tablet contains: Spironolactone BP 25 mg "
+            "Excipients q.s."
+        ),
+        "route": "Oral",
+        "pack_size": "1 x 500's (in a jar)",
+        "approval_date": "2021-12-17",
+    }
+
+    def fake_lookup(self, registration_number):
+        normalized = "".join(
+            character.lower()
+            for character in str(registration_number or "")
+            if character.isalnum()
+        )
+        if normalized == "a4100160":
+            return GreenbookLookupResult(
+                status="match",
+                record=record,
+                message="Exact registration-number match found in Greenbook.",
+            )
+
+        return GreenbookLookupResult(
+            status="not_found",
+            record=None,
+            message=(
+                "No exact match for this registration number was found "
+                "in the live NAFDAC Greenbook lookup. This is not proof "
+                "of counterfeiting."
+            ),
+        )
+
+    monkeypatch.setattr(
+        main_module.GreenbookClient,
+        "lookup",
+        fake_lookup,
+    )
 
 
 def test_health_endpoint():
@@ -12,24 +71,20 @@ def test_health_endpoint():
     assert response.json()["status"] == "ok"
 
 
-def test_registry_metadata_reports_curated_records():
+def test_registry_metadata_reports_live_lookup_with_curated_fallback():
     response = client.get("/api/v1/registry")
 
     assert response.status_code == 200
     data = response.json()
 
-    assert data["dataset_label"] == "curated_source_record"
-    from pathlib import Path
-    import json
-
-    snapshot = json.loads(
-        Path("data/registry.json").read_text(encoding="utf-8")
-    )
-    assert data["record_count"] == len(snapshot["records"])
+    assert data["dataset_label"] == "live_lookup_with_curated_fallback"
+    assert data["record_count"] > 0
+    assert "live nafdac greenbook first" in data["source_note"].lower()
     assert "snapshot" in data["source_note"].lower()
+    assert "outdated" in data["source_note"].lower()
 
 
-def test_real_registry_record_can_be_checked():
+def test_live_registry_record_can_be_checked():
     response = client.post(
         "/api/v1/verify",
         json={
@@ -49,8 +104,11 @@ def test_real_registry_record_can_be_checked():
 
     assert data["matched_record"] is True
     assert data["status"] == "no_significant_discrepancy_detected"
-    assert data["dataset_label"] == "curated_source_record"
+    assert data["dataset_label"] == "live_source_record"
     assert data["source_name"] == "NAFDAC Greenbook"
+    assert data["registry_lookup_status"] == "match"
+    assert data["registry_retrieved_at"] is not None
+    assert data["registry_snapshot_retrieved_at"] is None
 
 
 def test_unknown_number_is_not_called_fake():
@@ -69,7 +127,51 @@ def test_unknown_number_is_not_called_fake():
 
     assert data["matched_record"] is False
     assert data["status"] == "verification_concern_detected"
-    assert "not proof of counterfeiting" in data["summary"].lower()
+    summary = data["summary"].lower()
+    assert "does not prove" in summary
+    assert "counterfeit" in summary
+
+
+def test_unavailable_greenbook_is_not_called_counterfeit(monkeypatch):
+    def unavailable_lookup(self, registration_number):
+        return GreenbookLookupResult(
+            status="unavailable",
+            record=None,
+            message="Could not reach the NAFDAC Greenbook.",
+        )
+
+    monkeypatch.setattr(
+        main_module.GreenbookClient,
+        "lookup",
+        unavailable_lookup,
+    )
+
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "Example Medicine",
+                "nafdac_reg_number": "A4-100160",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Live lookup failed, but the exact NRN exists in the curated snapshot.
+    assert data["matched_record"] is True
+    assert data["registry_lookup_status"] == "unavailable"
+    assert data["dataset_label"] == "curated_source_record"
+    assert data["registry_retrieved_at"] is None
+    assert data["registry_snapshot_retrieved_at"] is not None
+    assert data["status"] == "high_risk_discrepancy_detected"
+
+    summary = data["summary"].lower()
+    assert "live nafdac greenbook lookup" in summary
+    assert "did not" in summary
+    assert "snapshot" in summary or "curated" in summary
+    assert "not confirmation of current registration" in summary
 
 
 def test_alert_metadata_reports_curated_snapshot():

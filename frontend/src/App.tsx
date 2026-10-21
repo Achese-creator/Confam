@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import "./App.css";
 
-type View = "overview" | "verify" | "alerts";
+type View = "overview" | "verify" | "alerts" | "assistant";
 
 type PackageClaimsInput = {
   product_name: string;
@@ -47,13 +47,27 @@ type VerificationResult = {
   briefing?: string | null;
   matched_record: boolean;
   registry_snapshot_retrieved_at: string | null;
+  registry_lookup_status: "match" | "not_found" | "unavailable" | "not_searched";
+  registry_retrieved_at: string | null;
   alerts_snapshot_retrieved_at: string | null;
   checks: VerificationCheck[];
   safety_alerts: VerificationAlert[];
   source_name: string | null;
   source_url: string | null;
+  registry_applicant_name: string | null;
+  registry_manufacturer: string | null;
+  registry_registration_status: string | null;
+  registry_registration_expiry_date: string | null;
   dataset_label: string | null;
   limitations: string[];
+};
+
+type AgentResponse = {
+  answer: string;
+  tools_called: string[];
+  tool_call_count: number;
+  tool_errors: number;
+  tool_errors_by_name: string[];
 };
 
 type PackageExtractionResponse = {
@@ -88,6 +102,26 @@ const fieldLabels: Record<string, string> = {
   expiry_date: "Package expiry date",
   registration_expiry_date: "Registration expiry date",
 };
+
+function formatWATTimestamp(value: string | null): string {
+  if (!value) return "Not available";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Timestamp unavailable";
+
+  const formatted = new Intl.DateTimeFormat("en-NG", {
+    timeZone: "Africa/Lagos",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+
+  return `${formatted} WAT`;
+}
 
 type SafetyAlert = {
   alert_id: string;
@@ -165,6 +199,10 @@ function App() {
   const [uncertainFields, setUncertainFields] = useState<string[]>([]);
   const [extractionModel, setExtractionModel] = useState("");
   const [extractionLimitations, setExtractionLimitations] = useState<string[]>([]);
+  const [agentQuestion, setAgentQuestion] = useState("");
+  const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState("");
 
   useEffect(() => {
     if (view !== "alerts") return;
@@ -248,6 +286,44 @@ function App() {
       );
     } finally {
       setVerificationLoading(false);
+    }
+  }
+
+  async function submitAgentQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const question = agentQuestion.trim();
+    if (!question || agentLoading) return;
+
+    setAgentLoading(true);
+    setAgentError("");
+    setAgentResponse(null);
+
+    try {
+      const response = await fetch("/api/v1/agent/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const detail =
+          typeof body?.detail === "string"
+            ? body.detail
+            : `The API returned HTTP ${response.status}.`;
+        throw new Error(detail);
+      }
+
+      const result: AgentResponse = await response.json();
+      setAgentResponse(result);
+    } catch (error) {
+      setAgentError(
+        error instanceof Error
+          ? error.message
+          : "Unable to get an answer from the evidence assistant.",
+      );
+    } finally {
+      setAgentLoading(false);
     }
   }
 
@@ -389,6 +465,12 @@ function App() {
           >
             <span>⚑</span> Safety alerts
           </button>
+          <button
+            className={view === "assistant" ? "nav-item active" : "nav-item"}
+            onClick={() => setView("assistant")}
+          >
+            <span>✳</span> Ask CONFAM
+          </button>
         </nav>
 
         <div className="sidebar-note">
@@ -404,7 +486,7 @@ function App() {
 
       <main className="main-content">
         <header className="topbar">
-          <div className="breadcrumb">Workspace <span>/</span> {view === "overview" ? "Overview" : view === "verify" ? "Medicine check" : "Safety alerts"}</div>
+          <div className="breadcrumb">Workspace <span>/</span> {view === "overview" ? "Overview" : view === "verify" ? "Medicine check" : view === "alerts" ? "Safety alerts" : "Ask CONFAM"}</div>
           <div className="topbar-right">
             <span className="snapshot-pill"><span className="status-dot" /> Local evidence snapshot</span>
             <span className="avatar">CF</span>
@@ -765,13 +847,43 @@ function App() {
 
                 <div className="result-meta">
                   <span>
-                    Registry record: <strong>{verification.matched_record ? "Found" : "Not found"}</strong>
+                    Greenbook lookup:{" "}
+                    <strong>
+                      {verification.registry_lookup_status === "match"
+                        ? "Exact registration match"
+                        : verification.registry_lookup_status === "not_found"
+                          ? "No exact match found"
+                          : verification.registry_lookup_status === "unavailable"
+                            ? "Source unavailable"
+                            : "Not performed"}
+                    </strong>
                   </span>
+                  {verification.dataset_label === "curated_source_record" ? (
+                    <span>
+                      Curated local snapshot retrieved:{" "}
+                      <strong>
+                        {formatWATTimestamp(verification.registry_snapshot_retrieved_at)}
+                      </strong>
+                      {" "}— historical evidence; live registration was not confirmed.
+                    </span>
+                  ) : verification.dataset_label === "live_source_record" ? (
+                    <span>
+                      Live Greenbook lookup retrieved:{" "}
+                      <strong>
+                        {formatWATTimestamp(verification.registry_retrieved_at)}
+                      </strong>
+                    </span>
+                  ) : (
+                    <span>
+                      Live Greenbook retrieval:{" "}
+                      <strong>
+                        {formatWATTimestamp(verification.registry_retrieved_at)}
+                      </strong>
+                    </span>
+                  )}
                   <span>
-                    Registry snapshot: <strong>{verification.registry_snapshot_retrieved_at || "Unknown"}</strong>
-                  </span>
-                  <span>
-                    Alert snapshot: <strong>{verification.alerts_snapshot_retrieved_at || "Unknown"}</strong>
+                    Safety-alert snapshot retrieved:{" "}
+                    <strong>{formatWATTimestamp(verification.alerts_snapshot_retrieved_at)}</strong>
                   </span>
                 </div>
 
@@ -784,10 +896,75 @@ function App() {
                   </p>
                 )}
 
+                {(verification.registry_registration_status ||
+                  verification.registry_registration_expiry_date ||
+                  verification.registry_applicant_name ||
+                  verification.registry_manufacturer) && (
+                  <>
+                    <h3>
+                      {verification.dataset_label === "curated_source_record"
+                        ? "Registration details from curated snapshot"
+                        : "Greenbook registration details"}
+                    </h3>
+                    <div className="checks-list">
+                      {verification.registry_registration_status && (
+                        <article className="check-row">
+                          <div className="check-row-heading">
+                            <strong>
+                              {verification.dataset_label === "curated_source_record"
+                                ? "Registration status in curated snapshot"
+                                : "Registration status reported by Greenbook"}
+                            </strong>
+                            <span className="check-outcome not_checked">
+                              Registry finding
+                            </span>
+                          </div>
+                          <p>{verification.registry_registration_status}</p>
+                          <p className="check-explanation">
+                            {verification.dataset_label === "curated_source_record"
+                              ? "This value comes from CONFAM's curated historical snapshot. It has not been confirmed against the live registry for this check."
+                              : "This is the status reported by the cited registry, not a claim printed on the medicine package."}
+                          </p>
+                        </article>
+                      )}
+                      {verification.registry_registration_expiry_date && (
+                        <article className="check-row">
+                          <strong>Registration expiry date</strong>
+                          <p>{verification.registry_registration_expiry_date}</p>
+                          <p className="check-explanation">
+                            This is the registry registration expiry date, not
+                            the expiry date printed on the medicine package.
+                          </p>
+                        </article>
+                      )}
+                      {verification.registry_applicant_name && (
+                        <article className="check-row">
+                          <strong>Applicant / registration holder</strong>
+                          <p>{verification.registry_applicant_name}</p>
+                        </article>
+                      )}
+                      {verification.registry_manufacturer && (
+                        <article className="check-row">
+                          <strong>
+                            {verification.dataset_label === "curated_source_record"
+                              ? "Manufacturer listed in curated snapshot"
+                              : "Manufacturer reported by Greenbook"}
+                          </strong>
+                          <p>{verification.registry_manufacturer}</p>
+                        </article>
+                      )}
+                    </div>
+                  </>
+                )}
+
                 <h3>Field-by-field comparison</h3>
                 {verification.checks.length > 0 ? (
                   <div className="checks-list">
-                    {verification.checks.filter((check) => check.field !== "registration_expiry_date").map((check, index) => (
+                    {verification.checks.filter(
+                      (check) =>
+                        check.check_scope !== "registry_record_only" &&
+                        check.field !== "registration_expiry_date"
+                    ).map((check, index) => (
                       <article className="check-row" key={`${check.field}-${index}`}>
                         <div className="check-row-heading">
                           <strong>{fieldLabels[check.field] || check.field.replaceAll("_", " ")}</strong>
@@ -912,6 +1089,104 @@ function App() {
             </div>
 
             <button className="text-button" onClick={() => setView("overview")}>← Back to overview</button>
+          </section>
+        )}
+
+        {view === "assistant" && (
+          <section className="page assistant-page">
+            <div className="eyebrow">EVIDENCE ASSISTANT</div>
+            <h1 className="page-title">Ask CONFAM</h1>
+            <p className="page-intro">
+              Ask a question about medicine registration records or published
+              safety alerts. When useful, CONFAM can call its read-only evidence
+              tools and show which tools it invoked.
+            </p>
+
+            <form className="assistant-form" onSubmit={submitAgentQuestion}>
+              <label htmlFor="agent-question">What would you like to investigate?</label>
+              <textarea
+                id="agent-question"
+                value={agentQuestion}
+                onChange={(event) => setAgentQuestion(event.target.value)}
+                placeholder="For example: Check registration number A4-100160 and look for relevant safety alerts."
+                rows={5}
+                maxLength={2000}
+                required
+                disabled={agentLoading}
+              />
+              <div className="assistant-form-footer">
+                <span>{agentQuestion.length}/2000 characters</span>
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={agentLoading || !agentQuestion.trim()}
+                >
+                  {agentLoading ? "Checking evidence…" : "Ask CONFAM"}
+                  {!agentLoading && <span>→</span>}
+                </button>
+              </div>
+            </form>
+
+            {agentLoading && (
+              <p className="assistant-loading" role="status">
+                Consulting the evidence assistant. This may take a little while.
+              </p>
+            )}
+
+            {agentError && (
+              <div className="verification-error" role="alert">
+                <h2>Assistant request failed</h2>
+                <p>{agentError}</p>
+                <p>Check the backend and its Gemini configuration, then try again.</p>
+              </div>
+            )}
+
+            {agentResponse && (
+              <section className="assistant-result" aria-live="polite">
+                <div className="eyebrow">ASSISTANT RESPONSE</div>
+                <h2>Evidence summary</h2>
+                <div className="assistant-answer">{agentResponse.answer}</div>
+
+                <div className="assistant-trace">
+                  <h3>Tool execution trace</h3>
+                  <div className="assistant-trace-stats">
+                    <div>
+                      <strong>{agentResponse.tool_call_count}</strong>
+                      <span>Tool-call attempts</span>
+                    </div>
+                    <div>
+                      <strong>{agentResponse.tool_errors}</strong>
+                      <span>Tool errors</span>
+                    </div>
+                  </div>
+                  {agentResponse.tool_errors_by_name.length > 0 && (
+                    <p role="status">
+                      Failed tool(s):{" "}
+                      {agentResponse.tool_errors_by_name.join(", ")}.
+                      A tool error means its evidence could not be retrieved;
+                      it is not a negative finding about the medicine.
+                    </p>
+                  )}
+                  {agentResponse.tools_called.length > 0 ? (
+                    <ul>
+                      {agentResponse.tools_called.map((tool, index) => (
+                        <li key={`${tool}-${index}`}>
+                          <code>{tool}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No MCP tool calls were recorded for this response.</p>
+                  )}
+                </div>
+                <p className="assistant-disclaimer">
+                  CONFAM provides evidence-based decision support, not a
+                  guarantee of authenticity or safety. Missing records or
+                  alerts do not prove a product is counterfeit or safe.
+                  Confirm important findings with authoritative sources.
+                </p>
+              </section>
+            )}
           </section>
         )}
 

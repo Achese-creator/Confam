@@ -703,6 +703,10 @@ def verify_package(
                 "registry_record_only",
                 "package_only",
             }
+            # Missing reference data cannot establish a discrepancy.
+            # Missing package data still requires review when reference
+            # evidence exists for comparison.
+            and check.reference_value is not None
             for check in checks
         )
         or any(
@@ -768,10 +772,15 @@ def verify_package(
 
     limitations = [
         "A registration-number match does not prove package authenticity.",
-        "The local snapshot may be incomplete or outdated.",
         "This check cannot establish the medicine's chemical composition "
         "or physical authenticity.",
     ]
+
+    if reference.dataset_label != "live_source_record":
+        limitations.insert(
+            1,
+            "The local snapshot may be incomplete or outdated.",
+        )
 
     return VerificationResult(
         status=status,
