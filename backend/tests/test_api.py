@@ -63,6 +63,29 @@ def mock_greenbook_lookup(monkeypatch):
         fake_lookup,
     )
 
+    # Keep API tests independent of external Gemini calls.
+    monkeypatch.setattr(
+        main_module,
+        "reconcile_semantic_differences",
+        lambda result: None,
+    )
+    monkeypatch.setattr(
+        main_module,
+        "generate_evidence_briefing",
+        lambda result: "Test briefing.",
+    )
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        main_module.NAFDACSafetyAlertClient,
+        "lookup",
+        lambda self, **kwargs: SimpleNamespace(
+            status="live_no_matches",
+            records=[],
+            message="Live lookup mocked in API tests.",
+        ),
+    )
+
 
 def test_health_endpoint():
     response = client.get("/health")
@@ -388,3 +411,74 @@ def test_api_sporidex_exact_recalled_batch_triggers_high_risk():
         and alert["batch_match_status"] == "match"
         for alert in result["safety_alerts"]
     )
+
+def test_verify_deduplicates_live_and_curated_alerts(monkeypatch):
+    from types import SimpleNamespace
+    import app.main as main_module
+
+    curated_alert = next(
+        alert for alert in main_module.ALERT_RECORDS
+        if "BETACLOX" in alert.get("product_name", "").upper()
+    )
+
+    monkeypatch.setattr(
+        main_module.NAFDACSafetyAlertClient,
+        "lookup",
+        lambda self, **kwargs: SimpleNamespace(
+            status="live_matches_found",
+            records=[dict(curated_alert)],
+            message="Test live match.",
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "BETACLOX",
+                "nafdac_reg_number": "A4-4724",
+                "batch_number": "230701",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "high_risk_discrepancy_detected"
+    assert len(result["safety_alerts"]) == 1
+
+
+def test_verify_continues_when_live_alert_source_is_unavailable(monkeypatch):
+    from types import SimpleNamespace
+    import app.main as main_module
+
+    monkeypatch.setattr(
+        main_module.NAFDACSafetyAlertClient,
+        "lookup",
+        lambda self, **kwargs: SimpleNamespace(
+            status="live_unavailable",
+            records=[],
+            message="Simulated source timeout.",
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "Medicine Without a Known Alert",
+                "nafdac_reg_number": "UNKNOWN-TEST-NRN",
+                "batch_number": "TEST-BATCH",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert any(
+        "live NAFDAC safety-alert source could not be checked"
+        in limitation
+        for limitation in result["limitations"]
+    )
+    assert result["status"] != "high_risk_discrepancy_detected"
+

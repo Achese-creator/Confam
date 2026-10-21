@@ -125,6 +125,12 @@ class VerificationResult(BaseModel):
     ] = "not_searched"
     registry_retrieved_at: str | None = None
     alerts_snapshot_retrieved_at: str | None = None
+    alert_lookup_status: Literal[
+        "not_searched",
+        "live_matches_found",
+        "live_no_matches",
+        "live_unavailable",
+    ] = "not_searched"
     checks: list[FieldCheck] = Field(default_factory=list)
     safety_alerts: list[SafetyAlertEvidence] = Field(default_factory=list)
     source_name: str | None = None

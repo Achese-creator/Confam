@@ -8,6 +8,10 @@ import logging
 import os
 import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
@@ -125,7 +129,6 @@ async def _run_with_session(
             ),
             contents=contents,
             config=types.GenerateContentConfig(
-                temperature=0,
                 tools=gemini_tools,
                 max_output_tokens=1200,
             ),
@@ -232,6 +235,7 @@ async def _run_with_session(
             function_responses.append(
                 types.Part(
                     function_response=types.FunctionResponse(
+                        id=call.id,
                         name=name,
                         response={"result": payload},
                     )
@@ -283,10 +287,19 @@ async def _run_agent(
                     trace=trace,
                 )
     except Exception as exc:
-        logger.warning(
-            "Gemini-MCP agent failed (%s).",
+        logger.exception(
+            "Gemini-MCP agent failed (%s): %s",
             type(exc).__name__,
+            exc,
         )
+        nested = getattr(exc, "exceptions", ())
+        for index, child in enumerate(nested, start=1):
+            logger.error(
+                "Nested agent exception %s (%s): %s",
+                index,
+                type(child).__name__,
+                child,
+            )
         return (
             "The evidence assistant is temporarily unavailable. This does "
             "not indicate that a medicine is unregistered or counterfeit. "

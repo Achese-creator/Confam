@@ -13,6 +13,7 @@ from app.schemas import (
 )
 from app.verifier import verify_package
 from app.greenbook_client import GreenbookClient, GREENBOOK_URL
+from app.safety_alert_client import NAFDACSafetyAlertClient
 from app.extraction import ExtractionProviderError
 from app.gemini_extractor import GeminiPackageImageExtractor
 from app.gemini_briefing import generate_evidence_briefing
@@ -218,11 +219,79 @@ def verify(request: VerifyRequest):
             )
 
     selected_record = live_record or local_record
+
+    # Live alert evidence supplements, never replaces, the curated snapshot.
+    alert_lookup_status = "not_searched"
+    live_alert_records = []
+    alert_lookup_message = None
+
+    if claims.product_name and (
+        registration_number or (claims.batch_number or "").strip()
+    ):
+        try:
+            alert_lookup = NAFDACSafetyAlertClient().lookup(
+                product_name=claims.product_name,
+                registration_number=registration_number or None,
+                batch_number=(claims.batch_number or "").strip() or None,
+            )
+            alert_lookup_status = alert_lookup.status
+            alert_lookup_message = alert_lookup.message
+
+            if alert_lookup_status == "live_matches_found":
+                live_alert_records = alert_lookup.records or []
+        except Exception:
+            # Alert-source failures must not prevent deterministic verification.
+            alert_lookup_status = "live_unavailable"
+            alert_lookup_message = (
+                "The live safety-alert lookup failed unexpectedly."
+            )
+
+    # Prefer live evidence when the same official notice exists in both
+    # sources. Deduplicate by official URL, with a conservative title-based
+    # fallback for records that do not provide a URL.
+    combined_alert_records = []
+    seen_alert_keys = set()
+
+    for alert in live_alert_records + ALERT_RECORDS:
+        source_url = (alert.get("source_url") or "").strip().rstrip("/")
+        title = " ".join((alert.get("title") or "").casefold().split())
+        product = " ".join(
+            (alert.get("product_name") or "").casefold().split()
+        )
+
+        if source_url:
+            key = ("url", source_url.casefold())
+        else:
+            key = ("title_product", title, product)
+
+        if key in seen_alert_keys:
+            continue
+
+        seen_alert_keys.add(key)
+        combined_alert_records.append(alert)
+
     result = verify_package(
         claims,
         [selected_record] if selected_record is not None else [],
-        alert_records=ALERT_RECORDS,
+        alert_records=combined_alert_records,
     )
+
+    if alert_lookup_status == "live_unavailable":
+        result = result.model_copy(update={
+            "limitations": list(result.limitations) + [
+                "The live NAFDAC safety-alert source could not be checked. "
+                "Curated alert evidence was still considered; this source "
+                "failure does not establish whether the medicine is safe "
+                "or counterfeit."
+            ]
+        })
+    elif alert_lookup_status == "live_no_matches":
+        result = result.model_copy(update={
+            "limitations": list(result.limitations) + [
+                "The live safety-alert search returned no qualifying "
+                "notices. This does not establish that the medicine is safe."
+            ]
+        })
 
     using_local_fallback = live_record is None and local_record is not None
     updates = {
@@ -246,6 +315,7 @@ def verify(request: VerifyRequest):
             selected_record.registration_expiry_date if selected_record else None
         ),
         "alerts_snapshot_retrieved_at": ALERT_DATA["retrieved_at"],
+        "alert_lookup_status": alert_lookup_status,
     }
 
     if live_record is not None:

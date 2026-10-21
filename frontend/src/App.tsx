@@ -50,6 +50,11 @@ type VerificationResult = {
   registry_lookup_status: "match" | "not_found" | "unavailable" | "not_searched";
   registry_retrieved_at: string | null;
   alerts_snapshot_retrieved_at: string | null;
+  alert_lookup_status:
+    | "not_searched"
+    | "live_matches_found"
+    | "live_no_matches"
+    | "live_unavailable";
   checks: VerificationCheck[];
   safety_alerts: VerificationAlert[];
   source_name: string | null;
