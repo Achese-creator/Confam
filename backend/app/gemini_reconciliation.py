@@ -26,7 +26,7 @@ Your task:
   look similar or their ingredients match.
 - Never treat different strengths as equivalent.
 - Never dismiss a difference in active ingredients as harmless.
-- Do not infer a manufacturer from an applicant name.
+- Do not infer a manufacturer from an applicant name.\n- Do not treat the registry applicant as the manufacturer unless the source explicitly identifies it as such.\n- Keep manufacturer and marketer distinct; the package marketer may be compared with the registry applicant name, but this is not proof of identity.
 - Do not invent facts or external evidence.
 - Do not change, reinterpret, or override the deterministic outcomes.
 - Never declare the medicine genuine, counterfeit, safe, or unsafe.
@@ -42,6 +42,7 @@ def _ambiguous_checks(result: VerificationResult) -> list[dict]:
         "product_name",
         "dosage_form",
         "manufacturer",
+        "marketer",
     }
 
     selected = []
@@ -65,17 +66,17 @@ def reconcile_semantic_differences(
     if not checks:
         return None
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         return (
-            "AI semantic reconciliation was unavailable because Gemini is "
+            "AI semantic reconciliation was unavailable because Groq is "
             "not configured. The original field checks and risk assessment "
             "remain unchanged; manually review the flagged differences."
         )
 
     model_name = os.getenv(
-        "CONFAM_GEMINI_MODEL",
-        "gemini-3.5-flash-lite",
+        "CONFAM_TEXT_MODEL",
+        "openai/gpt-oss-120b",
     )
 
     evidence = {
@@ -100,28 +101,27 @@ def reconcile_semantic_differences(
     }
 
     try:
-        from google import genai
-        from google.genai import types
+        from groq import Groq
 
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
+        client = Groq(api_key=api_key, timeout=20.0)
+        response = client.chat.completions.create(
             model=model_name,
-            contents=[
-                RECONCILIATION_PROMPT,
-                "Evidence JSON:\n"
-                + json.dumps(evidence, ensure_ascii=False),
+            messages=[
+                {"role": "system", "content": RECONCILIATION_PROMPT},
+                {
+                    "role": "user",
+                    "content": "Evidence JSON:\n"
+                    + json.dumps(evidence, ensure_ascii=False),
+                },
             ],
-            config=types.GenerateContentConfig(
-                temperature=0,
-                response_mime_type="text/plain",
-                max_output_tokens=180,
-            ),
+            temperature=0,
+            max_completion_tokens=300,
         )
 
-        explanation = (response.text or "").strip()
+        explanation = (response.choices[0].message.content or "").strip()
         if not 30 <= len(explanation) <= 650:
             logger.warning(
-                "Gemini returned an unusable semantic reconciliation."
+                "Groq returned an unusable semantic reconciliation."
             )
             return (
                 "AI reconciliation did not return a usable explanation. "
@@ -136,7 +136,7 @@ def reconcile_semantic_differences(
 
     except Exception as exc:
         logger.warning(
-            "Semantic reconciliation failed (%s).",
+            "Groq semantic reconciliation failed (%s).",
             type(exc).__name__,
         )
         return (

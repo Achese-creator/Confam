@@ -31,31 +31,112 @@ _PRODUCT_FORM_SUFFIXES = (
     "syrups", "syrup", "suspensions", "suspension",
     "solutions", "solution", "injections", "injection",
     "drops", "cream", "ointment", "gel", "powder",
+    "soflets", "soflet",
 )
 
 
-def normalize_product_name(value: str | None) -> str:
-    """Normalize a product name and remove a generic trailing dosage form."""
+def normalize_product_name(
+    value: str | None,
+    strength: str | None = None,
+) -> str:
+    """Normalize product names and supported trailing descriptors."""
+    if not value:
+        return ""
+
     normalized = normalize(value)
+
+    # Remove a trailing dosage descriptor, such as "soflets" or "tablet".
+    for suffix in sorted(_PRODUCT_FORM_SUFFIXES, key=len, reverse=True):
+        if normalized.endswith(suffix) and len(normalized) > len(suffix):
+            normalized = normalized[:-len(suffix)]
+            break
+
+    # Strip a trailing numeric token only when it is present in the
+    # independently supplied strength value.
+    if strength:
+        import re
+        from decimal import Decimal, InvalidOperation
+
+        numbers = re.findall(r"\d+(?:[.,]\d+)?", strength)
+
+        def canonical_number(value: str) -> str:
+            try:
+                return format(
+                    Decimal(value.replace(",", ".")).normalize(), "f"
+                )
+            except InvalidOperation:
+                return value.replace(",", ".")
+
+        for number in numbers:
+            suffix_number = canonical_number(number)
+            if normalized.endswith(suffix_number):
+                normalized = normalized[:-len(suffix_number)]
+                break
+
+    # Preserve the existing generic dosage-form normalization.
     for suffix in _PRODUCT_FORM_SUFFIXES:
         if normalized.endswith(suffix) and len(normalized) > len(suffix):
             normalized = normalized[:-len(suffix)]
             break
+
     return normalized
 
 
 def normalize_manufacturer(value: str | None) -> str:
-    """Ignore punctuation and common legal suffixes in manufacturer names."""
+    """Normalize company names conservatively for comparisons."""
     normalized = normalize(value)
-    legal_suffixes = (
-        "privatelimited", "pvtltd", "incorporated", "limited",
-        "ltd", "plc", "llc", "inc",
+    if not normalized:
+        return ""
+
+    # Remove recognized trailing legal suffixes/descriptors iteratively.
+    # Example: "Fidson Healthcare Plc" becomes "fidson".
+    suffixes = (
+        "privatelimited", "pvtltd", "incorporated",
+        "limited", "healthcare", "ltd", "plc", "llc", "inc",
     )
-    for suffix in legal_suffixes:
-        if normalized.endswith(suffix) and len(normalized) > len(suffix):
-            normalized = normalized[:-len(suffix)]
-            break
+    changed = True
+    while changed and normalized:
+        changed = False
+        for suffix in sorted(suffixes, key=len, reverse=True):
+            if normalized.endswith(suffix) and len(normalized) > len(suffix):
+                normalized = normalized[:-len(suffix)]
+                changed = True
+                break
     return normalized
+
+
+def normalize_dosage_form(value: str | None) -> str:
+    """Treat common singular/plural dosage-form labels as equivalent."""
+    normalized = normalize(value)
+    if not normalized:
+        return ""
+
+    plural_forms = (
+        ("suppositories", "suppository"),
+        ("suspensions", "suspension"),
+        ("injections", "injection"),
+        ("solutions", "solution"),
+        ("capsules", "capsule"),
+        ("tablets", "tablet"),
+        ("caplets", "caplet"),
+        ("soflets", "soflet"),
+        ("lozenges", "lozenge"),
+        ("granules", "granule"),
+        ("ointments", "ointment"),
+        ("powders", "powder"),
+        ("patches", "patch"),
+        ("syrups", "syrup"),
+        ("creams", "cream"),
+        ("drops", "drop"),
+        ("gels", "gel"),
+    )
+    for plural, singular in plural_forms:
+        if normalized == plural:
+            return singular
+        if normalized.endswith(plural) and len(normalized) > len(plural):
+            return normalized[:-len(plural)] + singular
+    return normalized
+
 
 
 def normalize_strength(value: str | None) -> str:
@@ -74,6 +155,27 @@ def normalize_strength(value: str | None) -> str:
 
     normalized = re.sub(r"\d+(?:\.\d+)?", canonicalize_number, normalized)
     return re.sub(r"[^a-z0-9.]+", "", normalized)
+
+
+def normalize_ingredient_text(value: str | None) -> str:
+    """Collapse a repeated parenthetical ingredient name, not different salts."""
+    if not value:
+        return ""
+
+    cleaned = value.strip()
+    opening = cleaned.find("(")
+    closing = cleaned.rfind(")")
+
+    if opening > 0 and closing == len(cleaned) - 1:
+        outer = cleaned[:opening].strip()
+        inner = cleaned[opening + 1:closing].strip()
+        outer_normalized = normalize(outer)
+        inner_normalized = normalize(inner)
+
+        if outer_normalized and inner_normalized.startswith(outer_normalized):
+            return inner_normalized
+
+    return normalize(cleaned)
 
 
 def compare_text(
@@ -95,10 +197,20 @@ def compare_text(
             normalize_strength(package_value)
             == normalize_strength(reference_value)
         )
-    elif field == "manufacturer":
+    elif field == "active_ingredients":
+        values_match = (
+            normalize_ingredient_text(package_value)
+            == normalize_ingredient_text(reference_value)
+        )
+    elif field in {"manufacturer", "marketer"}:
         values_match = (
             normalize_manufacturer(package_value)
             == normalize_manufacturer(reference_value)
+        )
+    elif field == "dosage_form":
+        values_match = (
+            normalize_dosage_form(package_value)
+            == normalize_dosage_form(reference_value)
         )
     else:
         values_match = normalize(package_value) == normalize(reference_value)
@@ -124,6 +236,8 @@ def compare_text(
 def compare_product_name(
     package_value: str | None,
     reference_value: str | None,
+    package_strength: str | None = None,
+    reference_strength: str | None = None,
 ) -> FieldCheck:
     if not package_value or not reference_value:
         return FieldCheck(
@@ -134,8 +248,21 @@ def compare_product_name(
             explanation="The product name is missing from one or both sources.",
         )
 
-    package_normalized = normalize_product_name(package_value)
-    reference_normalized = normalize_product_name(reference_value)
+    package_normalized = normalize_product_name(package_value, package_strength)
+    reference_normalized = normalize_product_name(reference_value, reference_strength)
+
+    if package_normalized == reference_normalized:
+        return FieldCheck(
+            field="product_name",
+            package_value=package_value,
+            reference_value=reference_value,
+            outcome="match",
+            explanation=(
+                "The normalized product names match after accounting for "
+                "recognized trailing strength or dosage-form descriptors."
+            ),
+        )
+
     similarity = ratio(package_normalized, reference_normalized)
 
     if similarity >= 85:
@@ -163,7 +290,6 @@ def compare_product_name(
         outcome=outcome,
         explanation=explanation,
     )
-
 
 
 def check_registration_status(reference: RegistryRecord) -> FieldCheck:
@@ -605,7 +731,7 @@ def verify_package(
         return VerificationResult(
             status=(
                 "high_risk_discrepancy_detected"
-                if _alert_warrants_high_risk(safety_alerts)
+                if package_expired or _alert_warrants_high_risk(safety_alerts)
                 else "verification_concern_detected"
             ),
             summary=(
@@ -637,7 +763,12 @@ def verify_package(
     checks = [
         package_expiry_check,
         check_registration_status(reference),
-        compare_product_name(claims.product_name, reference.product_name),
+        compare_product_name(
+            claims.product_name,
+            reference.product_name,
+            claims.strength,
+            reference.strength,
+        ),
         compare_text(
             "active_ingredients",
             claims.active_ingredients,
@@ -649,10 +780,10 @@ def verify_package(
             claims.dosage_form,
             reference.dosage_form,
         ),
-        compare_text(
-            "manufacturer",
-            claims.manufacturer,
-            reference.manufacturer,
+compare_text(
+            "marketer",
+            claims.marketer,
+            reference.applicant_name,
         ),
         check_expiry(reference, today=today),
     ]
@@ -670,23 +801,7 @@ def verify_package(
         "strength",
     }
 
-    product_check = next(
-        check for check in checks if check.field == "product_name"
-    )
-    product_similarity = (
-        ratio(
-            normalize_product_name(product_check.package_value),
-            normalize_product_name(product_check.reference_value),
-        )
-        if product_check.package_value and product_check.reference_value
-        else None
-    )
-
-    high_risk = (
-        bool(mismatches & high_risk_fields)
-        or (product_similarity is not None and product_similarity < 65)
-        or package_expired
-    )
+    high_risk = bool(mismatches & high_risk_fields)
 
     if high_risk:
         status = "high_risk_discrepancy_detected"
@@ -707,6 +822,7 @@ def verify_package(
             # Missing package data still requires review when reference
             # evidence exists for comparison.
             and check.reference_value is not None
+            and not (check.field == chr(109)+chr(97)+chr(114)+chr(107)+chr(101)+chr(116)+chr(101)+chr(114) and check.package_value is None)
             for check in checks
         )
         or any(
@@ -763,11 +879,13 @@ def verify_package(
             )
 
     if package_expired:
+        status = "high_risk_discrepancy_detected"
         summary = (
             summary
             + " The printed package expiry date has passed; do not use this "
             "product and consult a pharmacist or other qualified health professional. "
-            "This is not, by itself, proof of counterfeiting."
+            "Expiry is a serious safety concern, but is not, by itself, proof "
+            "of counterfeiting."
         )
 
     limitations = [

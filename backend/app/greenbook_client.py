@@ -10,6 +10,7 @@ from html import unescape
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from time import sleep
 
 from rapidfuzz.fuzz import ratio
 
@@ -170,6 +171,23 @@ class GreenbookClient:
 
         return rows
 
+
+    def _fetch_rows_with_retry(self, search_term: str) -> list[dict]:
+        """Retry a failed live request once; never convert failure to no-match."""
+        last_error = None
+
+        for attempt in range(2):
+            try:
+                return self._fetch_rows(search_term)
+            except GreenbookUnavailable as exc:
+                last_error = exc
+                if attempt == 0:
+                    sleep(0.25)
+
+        raise GreenbookUnavailable(
+            f"Greenbook lookup failed after 2 attempts: {last_error}"
+        ) from last_error
+
     def lookup(self, registration_number: str) -> GreenbookLookupResult:
         requested = normalize_registration_number(registration_number)
         if not requested:
@@ -179,7 +197,7 @@ class GreenbookClient:
             )
 
         try:
-            rows = self._fetch_rows(registration_number)
+            rows = self._fetch_rows_with_retry(registration_number)
         except GreenbookUnavailable as exc:
             return GreenbookLookupResult(
                 status="unavailable",
@@ -245,7 +263,7 @@ class GreenbookClient:
         limit = max(1, min(limit, 10))
 
         try:
-            rows = self._fetch_rows(product_name.strip())
+            rows = self._fetch_rows_with_retry(product_name.strip())
         except GreenbookUnavailable as exc:
             return GreenbookProductSearchResult(
                 status="unavailable",

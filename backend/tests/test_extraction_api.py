@@ -1,4 +1,4 @@
-from fastapi.testclient import TestClient
+﻿from fastapi.testclient import TestClient
 
 from app.main import app
 from app.gemini_extractor import GeminiPackageImageExtractor
@@ -41,7 +41,7 @@ def test_extract_rejects_unsupported_mime_type():
 
 
 def test_extract_returns_configuration_error_without_api_key(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     response = client.post(
         "/api/v1/extract",
@@ -55,7 +55,7 @@ def test_extract_returns_configuration_error_without_api_key(monkeypatch):
     )
 
     assert response.status_code == 503
-    assert "GEMINI_API_KEY" in response.json()["detail"]
+    assert "GROQ_API_KEY" in response.json()["detail"]
 
 
 def test_extract_endpoint_uses_extractor_result(monkeypatch):
@@ -158,3 +158,4 @@ def test_extract_multiple_rejects_invalid_photo():
 
     assert response.status_code == 415
     assert "Photo 2" in response.json()["detail"]
+

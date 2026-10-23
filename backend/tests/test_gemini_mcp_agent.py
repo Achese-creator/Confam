@@ -1,150 +1,146 @@
-"""Tests for the bounded Gemini function-calling loop."""
-
-import asyncio
+﻿import asyncio
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.gemini_mcp_agent import (
-    _run_with_session,
-    _tool_result_payload,
-)
+from app.gemini_mcp_agent import _run_with_session, _tool_result_payload
+
+
+def tool(name="get_relevant_safety_alerts"):
+    return SimpleNamespace(
+        name=name,
+        description="Retrieve evidence.",
+        inputSchema={
+            "type": "object",
+            "properties": {"product_name": {"type": "string"}},
+            "required": ["product_name"],
+        },
+    )
+
+
+def completion(message):
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=message)]
+    )
+
+
+def assistant_text(text):
+    return SimpleNamespace(content=text, tool_calls=None)
+
+
+def assistant_tool_call(
+    name="get_relevant_safety_alerts",
+    arguments='{"product_name":"Example medicine"}',
+    call_id="call-1",
+):
+    return SimpleNamespace(
+        content=None,
+        tool_calls=[
+            SimpleNamespace(
+                id=call_id,
+                function=SimpleNamespace(name=name, arguments=arguments),
+            )
+        ],
+    )
+
+
+def make_session(tools=None, result=None, error=None):
+    session = MagicMock()
+    session.list_tools = AsyncMock(
+        return_value=SimpleNamespace(tools=tools or [])
+    )
+    if error:
+        session.call_tool = AsyncMock(side_effect=error)
+    else:
+        session.call_tool = AsyncMock(
+            return_value=result or SimpleNamespace(isError=False, content=[])
+        )
+    return session
+
+
+def make_client(*messages):
+    client = MagicMock()
+    client.chat.completions.create.side_effect = [
+        completion(message) for message in messages
+    ]
+    return client
 
 
 def test_tool_result_parses_json_content():
     result = SimpleNamespace(
         isError=False,
-        content=[
-            SimpleNamespace(
-                text='{"status":"not_found","record":null}'
-            )
-        ],
+        content=[SimpleNamespace(text='{"status":"not_found","record":null}')],
     )
-
     payload = _tool_result_payload(result)
-
     assert payload["tool_error"] is False
     assert payload["content"][0]["status"] == "not_found"
 
 
-def test_tool_error_is_not_misrepresented_as_negative_evidence():
-    result = SimpleNamespace(isError=True, content=[])
-
-    payload = _tool_result_payload(result)
-
+def test_tool_error_is_not_negative_evidence():
+    payload = _tool_result_payload(
+        SimpleNamespace(isError=True, content=[])
+    )
     assert payload["tool_error"] is True
     assert "error" in payload["message"].lower()
 
 
-def test_empty_query_does_not_call_gemini():
-    session = MagicMock()
-    client = MagicMock()
-
-    answer = asyncio.run(
-        _run_with_session(session, client, "   ")
-    )
-
+def test_empty_query_does_not_call_provider():
+    session, client = MagicMock(), MagicMock()
+    answer = asyncio.run(_run_with_session(session, client, "  "))
     assert "provide a question" in answer.lower()
     session.list_tools.assert_not_called()
-    client.models.generate_content.assert_not_called()
+    client.chat.completions.create.assert_not_called()
 
 
 def test_invalid_round_limit_is_rejected():
     with pytest.raises(ValueError):
         asyncio.run(
             _run_with_session(
-                MagicMock(),
-                MagicMock(),
-                "Check this medicine",
-                max_tool_rounds=0,
+                MagicMock(), MagicMock(), "Check medicine", max_tool_rounds=0
             )
         )
 
 
 def test_missing_tools_returns_safe_message():
-    session = MagicMock()
-    session.list_tools = AsyncMock(
-        return_value=SimpleNamespace(tools=[])
-    )
-
+    session = make_session()
     answer = asyncio.run(
-        _run_with_session(session, MagicMock(), "Check this medicine")
+        _run_with_session(session, MagicMock(), "Check medicine")
     )
-
     assert "no evidence tools" in answer.lower()
 
 
-def test_gemini_tool_call_uses_mcp_session():
-    from google.genai import types
-
-    session = MagicMock()
-    session.list_tools = AsyncMock(
-        return_value=SimpleNamespace(
-            tools=[
-                SimpleNamespace(
-                    name="get_relevant_safety_alerts",
-                    description="Retrieve relevant safety alerts.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "product_name": {"type": "string"}
-                        },
-                        "required": ["product_name"],
-                    },
-                )
-            ]
-        )
-    )
-    session.call_tool = AsyncMock(
-        return_value=SimpleNamespace(
+def test_groq_tool_call_uses_mcp_and_records_trace():
+    session = make_session(
+        [tool()],
+        SimpleNamespace(
             isError=False,
             content=[
                 SimpleNamespace(
                     text='{"status":"no_matches_found","alerts":[]}'
                 )
             ],
-        )
-    )
-
-    function_call = types.FunctionCall(
-        name="get_relevant_safety_alerts",
-        args={"product_name": "Example medicine"},
-    )
-    function_part = types.Part(function_call=function_call)
-    call_content = types.Content(role="model", parts=[function_part])
-    final_content = types.Content(
-        role="model",
-        parts=[types.Part(text="No matching alert was found in this snapshot.")],
-    )
-
-    client = MagicMock()
-    client.models.generate_content.side_effect = [
-        SimpleNamespace(
-            candidates=[SimpleNamespace(content=call_content)]
         ),
-        SimpleNamespace(
-            candidates=[SimpleNamespace(content=final_content)]
-        ),
-    ]
-
+    )
+    client = make_client(
+        assistant_tool_call(),
+        assistant_text("No matching alert was found in this snapshot."),
+    )
     trace = {
         "tools_called": [],
         "tool_call_count": 0,
         "tool_errors": 0,
     }
+
     answer = asyncio.run(
         _run_with_session(
-            session,
-            client,
-            "Check alerts for Example medicine",
-            trace=trace,
+            session, client, "Check alerts for Example medicine", trace=trace
         )
     )
 
     session.call_tool.assert_awaited_once_with(
-        "get_relevant_safety_alerts",
-        {"product_name": "Example medicine"},
+        "get_relevant_safety_alerts", {"product_name": "Example medicine"}
     )
     assert trace == {
         "tools_called": ["get_relevant_safety_alerts"],
@@ -153,259 +149,111 @@ def test_gemini_tool_call_uses_mcp_session():
         "tool_errors_by_name": [],
     }
     assert "No matching alert" in answer
-    assert client.models.generate_content.call_count == 2
+    assert client.chat.completions.create.call_count == 2
+    first_call = client.chat.completions.create.call_args_list[0].kwargs
+    assert first_call["tool_choice"] == "auto"
+    assert first_call["tools"][0]["function"]["name"] == (
+        "get_relevant_safety_alerts"
+    )
 
 
 def test_tool_call_loop_is_bounded():
-    from google.genai import types
-
-    session = MagicMock()
-    session.list_tools = AsyncMock(
-        return_value=SimpleNamespace(
-            tools=[
-                SimpleNamespace(
-                    name="search_greenbook_by_nrn",
-                    description="Exact lookup.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "registration_number": {"type": "string"}
-                        },
-                        "required": ["registration_number"],
-                    },
-                )
-            ]
-        )
+    session = make_session(
+        [tool("search_greenbook_by_nrn")]
     )
-    session.call_tool = AsyncMock(
-        return_value=SimpleNamespace(isError=False, content=[])
+    client = make_client(
+        assistant_tool_call(
+            "search_greenbook_by_nrn",
+            '{"product_name":"Example"}',
+        ),
+        assistant_tool_call(
+            "search_greenbook_by_nrn",
+            '{"product_name":"Example"}',
+            "call-2",
+        ),
     )
-
-    call_content = types.Content(
-        role="model",
-        parts=[
-            types.Part(
-                function_call=types.FunctionCall(
-                    name="search_greenbook_by_nrn",
-                    args={"registration_number": "TEST-NRN"},
-                )
-            )
-        ],
-    )
-    client = MagicMock()
-    client.models.generate_content.return_value = SimpleNamespace(
-        candidates=[SimpleNamespace(content=call_content)]
-    )
-
     answer = asyncio.run(
         _run_with_session(
-            session,
-            client,
-            "Look up this NRN",
-            max_tool_rounds=1,
+            session, client, "Look up this medicine", max_tool_rounds=1
         )
     )
-
     assert "tool-call limit" in answer.lower()
-    assert client.models.generate_content.call_count == 2
+    assert client.chat.completions.create.call_count == 2
     assert session.call_tool.await_count == 1
 
 
-def test_mcp_error_result_is_traced_by_tool_name():
-    from google.genai import types
-
-    session = MagicMock()
-    session.list_tools = AsyncMock(
-        return_value=SimpleNamespace(
-            tools=[
-                SimpleNamespace(
-                    name="get_relevant_safety_alerts",
-                    description="Retrieve relevant safety alerts.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "product_name": {"type": "string"}
-                        },
-                        "required": ["product_name"],
-                    },
-                )
-            ]
-        )
+def test_mcp_error_result_is_traced():
+    session = make_session(
+        [tool()],
+        SimpleNamespace(isError=True, content=[]),
     )
-    session.call_tool = AsyncMock(
-        return_value=SimpleNamespace(isError=True, content=[])
+    client = make_client(
+        assistant_tool_call(),
+        assistant_text("The evidence tool failed; no conclusion can be drawn."),
     )
-
-    call_content = types.Content(
-        role="model",
-        parts=[
-            types.Part(
-                function_call=types.FunctionCall(
-                    name="get_relevant_safety_alerts",
-                    args={"product_name": "Example medicine"},
-                )
-            )
-        ],
-    )
-    final_content = types.Content(
-        role="model",
-        parts=[types.Part(text="The evidence tool failed; no conclusion can be drawn.")],
-    )
-    client = MagicMock()
-    client.models.generate_content.side_effect = [
-        SimpleNamespace(candidates=[SimpleNamespace(content=call_content)]),
-        SimpleNamespace(candidates=[SimpleNamespace(content=final_content)]),
-    ]
-    trace = {
-        "tools_called": [],
-        "tool_call_count": 0,
-        "tool_errors": 0,
-    }
+    trace = {"tools_called": [], "tool_call_count": 0, "tool_errors": 0}
 
     answer = asyncio.run(
-        _run_with_session(
-            session, client, "Check safety alerts", trace=trace
-        )
+        _run_with_session(session, client, "Check alerts", trace=trace)
     )
-
-    assert session.call_tool.await_count == 1
-    assert trace == {
-        "tools_called": ["get_relevant_safety_alerts"],
-        "tool_call_count": 1,
-        "tool_errors": 1,
-        "tool_errors_by_name": ["get_relevant_safety_alerts"],
-    }
+    assert trace["tool_errors"] == 1
+    assert trace["tool_errors_by_name"] == ["get_relevant_safety_alerts"]
     assert "no conclusion" in answer.lower()
 
 
-def test_mcp_exception_is_traced_by_tool_name():
-    from google.genai import types
-
-    session = MagicMock()
-    session.list_tools = AsyncMock(
-        return_value=SimpleNamespace(
-            tools=[
-                SimpleNamespace(
-                    name="search_greenbook_by_nrn",
-                    description="Look up an exact registration number.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "registration_number": {"type": "string"}
-                        },
-                        "required": ["registration_number"],
-                    },
-                )
-            ]
-        )
+def test_mcp_exception_is_traced():
+    session = make_session([tool()], error=RuntimeError("private error"))
+    client = make_client(
+        assistant_tool_call(),
+        assistant_text("The registry lookup failed; the result is unknown."),
     )
-    session.call_tool = AsyncMock(
-        side_effect=RuntimeError("simulated MCP failure")
-    )
-
-    call_content = types.Content(
-        role="model",
-        parts=[
-            types.Part(
-                function_call=types.FunctionCall(
-                    name="search_greenbook_by_nrn",
-                    args={"registration_number": "TEST-NRN"},
-                )
-            )
-        ],
-    )
-    final_content = types.Content(
-        role="model",
-        parts=[types.Part(text="The registry lookup failed; the result is unknown.")],
-    )
-    client = MagicMock()
-    client.models.generate_content.side_effect = [
-        SimpleNamespace(candidates=[SimpleNamespace(content=call_content)]),
-        SimpleNamespace(candidates=[SimpleNamespace(content=final_content)]),
-    ]
-    trace = {
-        "tools_called": [],
-        "tool_call_count": 0,
-        "tool_errors": 0,
-    }
+    trace = {"tools_called": [], "tool_call_count": 0, "tool_errors": 0}
 
     answer = asyncio.run(
-        _run_with_session(
-            session, client, "Look up TEST-NRN", trace=trace
-        )
+        _run_with_session(session, client, "Check registry", trace=trace)
     )
-
-    assert session.call_tool.await_count == 1
-    assert trace == {
-        "tools_called": ["search_greenbook_by_nrn"],
-        "tool_call_count": 1,
-        "tool_errors": 1,
-        "tool_errors_by_name": ["search_greenbook_by_nrn"],
-    }
+    assert trace["tool_errors"] == 1
+    assert trace["tool_errors_by_name"] == ["get_relevant_safety_alerts"]
     assert "unknown" in answer.lower()
 
 
 def test_unregistered_tool_is_rejected_and_traced():
-    from google.genai import types
-
-    session = MagicMock()
-    session.list_tools = AsyncMock(
-        return_value=SimpleNamespace(
-            tools=[
-                SimpleNamespace(
-                    name="search_greenbook_by_nrn",
-                    description="Look up an exact registration number.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "registration_number": {"type": "string"}
-                        },
-                        "required": ["registration_number"],
-                    },
-                )
-            ]
-        )
+    session = make_session([tool("search_greenbook_by_nrn")])
+    client = make_client(
+        assistant_tool_call("delete_registry_records"),
+        assistant_text("That requested tool is unavailable."),
     )
-    session.call_tool = AsyncMock()
-
-    call_content = types.Content(
-        role="model",
-        parts=[
-            types.Part(
-                function_call=types.FunctionCall(
-                    name="delete_registry_records",
-                    args={"registration_number": "TEST-NRN"},
-                )
-            )
-        ],
-    )
-    final_content = types.Content(
-        role="model",
-        parts=[types.Part(text="That requested tool is unavailable.")],
-    )
-    client = MagicMock()
-    client.models.generate_content.side_effect = [
-        SimpleNamespace(candidates=[SimpleNamespace(content=call_content)]),
-        SimpleNamespace(candidates=[SimpleNamespace(content=final_content)]),
-    ]
-    trace = {
-        "tools_called": [],
-        "tool_call_count": 0,
-        "tool_errors": 0,
-    }
+    trace = {"tools_called": [], "tool_call_count": 0, "tool_errors": 0}
 
     answer = asyncio.run(
-        _run_with_session(
-            session, client, "Check this medicine", trace=trace
-        )
+        _run_with_session(session, client, "Check medicine", trace=trace)
     )
-
     session.call_tool.assert_not_awaited()
-    assert trace == {
-        "tools_called": [],
-        "tool_call_count": 1,
-        "tool_errors": 1,
-        "tool_errors_by_name": ["delete_registry_records"],
-    }
+    assert trace["tool_call_count"] == 1
+    assert trace["tool_errors"] == 1
+    assert trace["tool_errors_by_name"] == ["delete_registry_records"]
     assert "unavailable" in answer.lower()
 
+
+def test_malformed_tool_arguments_are_rejected():
+    session = make_session([tool()])
+    client = make_client(
+        assistant_tool_call(arguments="{bad json"),
+        assistant_text("Tool arguments were invalid."),
+    )
+    trace = {"tools_called": [], "tool_call_count": 0, "tool_errors": 0}
+
+    asyncio.run(
+        _run_with_session(session, client, "Check medicine", trace=trace)
+    )
+    session.call_tool.assert_not_awaited()
+    assert trace["tool_errors"] == 1
+
+
+def test_blank_final_answer_uses_fallback():
+    session = make_session([tool()])
+    client = make_client(assistant_text("  "))
+    answer = asyncio.run(
+        _run_with_session(session, client, "Check medicine")
+    )
+    assert "could not produce a usable response" in answer.lower()

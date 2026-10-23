@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import "./App.css";
 
 type View = "overview" | "verify" | "alerts" | "assistant";
@@ -9,7 +11,7 @@ type PackageClaimsInput = {
   strength: string;
   dosage_form: string;
   nafdac_reg_number: string;
-  manufacturer: string;
+  marketer: string;
   batch_number: string;
   manufacturing_date: string;
   expiry_date: string;
@@ -89,7 +91,7 @@ const emptyClaims: PackageClaimsInput = {
   strength: "",
   dosage_form: "",
   nafdac_reg_number: "",
-  manufacturer: "",
+  marketer: "",
   batch_number: "",
   manufacturing_date: "",
   expiry_date: "",
@@ -101,7 +103,7 @@ const fieldLabels: Record<string, string> = {
   strength: "Strength",
   dosage_form: "Dosage form",
   nafdac_reg_number: "NAFDAC registration number",
-  manufacturer: "Manufacturer",
+  marketer: "Reg. Holder / Marketer",
   batch_number: "Batch number",
   manufacturing_date: "Manufacturing date",
   expiry_date: "Package expiry date",
@@ -766,12 +768,12 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  Manufacturer {uncertaintyBadge("manufacturer")}
+                  Reg. Holder / Marketer {uncertaintyBadge("marketer")}
                   <input
-                    name="manufacturer"
-                    value={claims.manufacturer}
-                    onChange={(event) => updateClaim("manufacturer", event.target.value)}
-                    placeholder="As printed on the package"
+                    name="marketer"
+                    value={claims.marketer}
+                    onChange={(event) => updateClaim("marketer", event.target.value)}
+                    placeholder="Nigerian company responsible for the product"
                   />
                 </label>
 
@@ -983,7 +985,9 @@ function App() {
                         </div>
                         <div className="check-values">
                           <p><span>Package claim</span>{check.package_value || "Not provided"}</p>
-                          <p><span>Reference record</span>{check.reference_value || "Not available"}</p>
+                          {check.field !== "expiry_date" && (
+                            <p><span>Reference record</span>{check.reference_value || "Not available"}</p>
+                          )}
                           {check.field === "expiry_date" && (
                             <p>
                               <span>Expiry status</span>
@@ -995,14 +999,28 @@ function App() {
                             </p>
                           )}
                         </div>
-                        {check.outcome !== "match" && (
-                          <p className="check-explanation">{check.explanation}</p>
-                        )}
+                        {check.outcome !== "match" &&
+                          !/normaliz|comparison score|similarity score|text[- ]similarity/i.test(check.explanation || "") && (
+                            <p className="check-explanation">{check.explanation}</p>
+                          )}
                       </article>
                     ))}
                   </div>
                 ) : (
                   <p>No field-level comparisons were available for this result.</p>
+                )}
+
+                {verification.alert_lookup_status !== "not_searched" && (
+                  <div className="alert-data-note" role="status">
+                    <strong>Live NAFDAC alert lookup</strong>
+                    <p>
+                      {verification.alert_lookup_status === "live_matches_found"
+                        ? "Matching alert evidence was found in the live lookup. Review the notices below and check their scope."
+                        : verification.alert_lookup_status === "live_no_matches"
+                          ? "No matching alert was found in the live lookup. This does not prove that no alert exists; the search may not cover every notice."
+                          : "The live NAFDAC alert lookup was unavailable. An unsuccessful lookup cannot confirm that no relevant alerts exist."}
+                    </p>
+                  </div>
                 )}
 
                 {verification.safety_alerts.length > 0 && (
@@ -1045,12 +1063,12 @@ function App() {
 
                 <div className="result-briefing">
                   <h3>Evidence briefing</h3>
-                  <p>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {verification.briefing ||
                       verification.summary +
                         " Review the field comparisons and relevant safety alerts above. " +
                         "A matching registration number does not establish physical authenticity."}
-                  </p>
+                  </ReactMarkdown>
                 </div>
 
                 <button
@@ -1083,15 +1101,6 @@ function App() {
               </section>
             )}
 
-            <div className="notice">
-              <span className="notice-icon">i</span>
-              <p>
-                <strong>Independent decision support.</strong> This result is
-                based on a small, versioned dataset. It does not establish
-                chemical composition, contamination, or physical authenticity
-                and is not an official NAFDAC verdict.
-              </p>
-            </div>
 
             <button className="text-button" onClick={() => setView("overview")}>← Back to overview</button>
           </section>
@@ -1150,40 +1159,9 @@ function App() {
               <section className="assistant-result" aria-live="polite">
                 <div className="eyebrow">ASSISTANT RESPONSE</div>
                 <h2>Evidence summary</h2>
-                <div className="assistant-answer">{agentResponse.answer}</div>
+                <div className="assistant-answer"><ReactMarkdown remarkPlugins={[remarkGfm]}>{agentResponse.answer}</ReactMarkdown></div>
 
-                <div className="assistant-trace">
-                  <h3>Tool execution trace</h3>
-                  <div className="assistant-trace-stats">
-                    <div>
-                      <strong>{agentResponse.tool_call_count}</strong>
-                      <span>Tool-call attempts</span>
-                    </div>
-                    <div>
-                      <strong>{agentResponse.tool_errors}</strong>
-                      <span>Tool errors</span>
-                    </div>
-                  </div>
-                  {agentResponse.tool_errors_by_name.length > 0 && (
-                    <p role="status">
-                      Failed tool(s):{" "}
-                      {agentResponse.tool_errors_by_name.join(", ")}.
-                      A tool error means its evidence could not be retrieved;
-                      it is not a negative finding about the medicine.
-                    </p>
-                  )}
-                  {agentResponse.tools_called.length > 0 ? (
-                    <ul>
-                      {agentResponse.tools_called.map((tool, index) => (
-                        <li key={`${tool}-${index}`}>
-                          <code>{tool}</code>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>No MCP tool calls were recorded for this response.</p>
-                  )}
-                </div>
+                
                 <p className="assistant-disclaimer">
                   CONFAM provides evidence-based decision support, not a
                   guarantee of authenticity or safety. Missing records or

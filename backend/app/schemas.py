@@ -11,7 +11,7 @@ class PackageClaims(BaseModel):
     strength: str | None = None
     dosage_form: str | None = None
     nafdac_reg_number: str | None = None
-    manufacturer: str | None = None
+    marketer: str | None = None
     batch_number: str | None = None
     manufacturing_date: str | None = None
     expiry_date: str | None = None

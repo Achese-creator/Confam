@@ -49,7 +49,7 @@ def test_matching_claims_find_no_significant_discrepancy():
 
 
 def test_registration_number_for_different_product_is_high_risk():
-    record = sample_record(product_name="Mebendazole")
+    record = sample_record(product_name="Mebendazole", active_ingredients="Mebendazole")
 
     result = verify_package(
         matching_claims(product_name="Example Paracetamol"),
@@ -729,4 +729,73 @@ def test_strength_different_units_do_not_match():
         check for check in result.checks if check.field == "strength"
     )
     assert strength_check.outcome == "mismatch"
+
+
+
+def test_product_name_ignores_matching_strength_and_soflet_descriptor():
+    from app.verifier import compare_product_name
+
+    check = compare_product_name(
+        "Ciprotab", "Ciprotab 500 Soflets", "500 mg", "500 mg"
+    )
+    assert check.outcome == "match"
+
+
+def test_repeated_parenthetical_ingredient_name_matches():
+    from app.verifier import compare_text
+
+    check = compare_text(
+        "active_ingredients",
+        "Ciprofloxacin Hydrochloride",
+        "Ciprofloxacin (Ciprofloxacin Hydrochloride)",
+    )
+    assert check.outcome == "match"
+
+
+def test_different_ingredient_salts_do_not_match():
+    from app.verifier import compare_text
+
+    check = compare_text(
+        "active_ingredients",
+        "Ciprofloxacin Hydrochloride",
+        "Ciprofloxacin Lactate",
+    )
+    assert check.outcome == "mismatch"
+
+
+def test_product_name_difference_alone_is_a_concern_not_high_risk():
+    result = verify_package(
+        matching_claims(),
+        [sample_record(product_name="Unrelated Brand Name")],
+        today=date(2026, 10, 14),
+    )
+    assert result.status == "verification_concern_detected"
+
+
+def test_dosage_form_comparison_ignores_pluralization():
+    from app.verifier import compare_text
+
+    check = compare_text("dosage_form", "Tablet", "Tablets")
+    assert check.outcome == "match"
+
+
+def test_dosage_form_comparison_still_detects_different_forms():
+    from app.verifier import compare_text
+
+    check = compare_text("dosage_form", "Tablet", "Capsules")
+    assert check.outcome == "mismatch"
+
+
+def test_marketer_comparison_ignores_common_company_suffixes():
+    from app.verifier import compare_text
+
+    check = compare_text("marketer", "Fidson", "Fidson Healthcare Plc")
+    assert check.outcome == "match"
+
+
+def test_company_comparison_does_not_match_unrelated_names():
+    from app.verifier import compare_text
+
+    check = compare_text("marketer", "Fidson", "Emzor Pharmaceuticals")
+    assert check.outcome == "mismatch"
 

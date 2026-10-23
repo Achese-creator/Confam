@@ -12,7 +12,7 @@ def make_result(checks):
 
 
 def test_no_ambiguous_checks_skips_llm(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     result = make_result([
         FieldCheck(
@@ -28,7 +28,7 @@ def test_no_ambiguous_checks_skips_llm(monkeypatch):
 
 
 def test_missing_api_key_returns_safe_fallback(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     result = make_result([
         FieldCheck(
@@ -48,7 +48,7 @@ def test_missing_api_key_returns_safe_fallback(monkeypatch):
 
 
 def test_semantic_reconciliation_does_not_mutate_result(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     result = make_result([
         FieldCheck(
@@ -80,24 +80,34 @@ def test_successful_llm_reconciliation_preserves_deterministic_findings(
     monkeypatch,
 ):
     from types import SimpleNamespace
-    from google import genai
+    import groq
 
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
 
     expected_text = (
         "The product names may differ in wording, but the evidence "
         "does not establish that they refer to the same product."
     )
 
-    class FakeModels:
-        def generate_content(self, **kwargs):
-            return SimpleNamespace(text=expected_text)
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content=expected_text)
+                    )
+                ]
+            )
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
 
     class FakeClient:
         def __init__(self, **kwargs):
-            self.models = FakeModels()
+            self.chat = FakeChat()
 
-    monkeypatch.setattr(genai, "Client", FakeClient)
+    monkeypatch.setattr(groq, "Groq", FakeClient)
 
     result = make_result([
         FieldCheck(

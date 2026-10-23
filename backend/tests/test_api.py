@@ -188,7 +188,9 @@ def test_unavailable_greenbook_is_not_called_counterfeit(monkeypatch):
     assert data["dataset_label"] == "curated_source_record"
     assert data["registry_retrieved_at"] is None
     assert data["registry_snapshot_retrieved_at"] is not None
-    assert data["status"] == "high_risk_discrepancy_detected"
+    # A name-only difference is a review concern, not proof of a
+    # material medicine discrepancy. The live lookup failure is separate.
+    assert data["status"] == "verification_concern_detected"
 
     summary = data["summary"].lower()
     assert "live nafdac greenbook lookup" in summary
@@ -482,3 +484,48 @@ def test_verify_continues_when_live_alert_source_is_unavailable(monkeypatch):
     )
     assert result["status"] != "high_risk_discrepancy_detected"
 
+
+
+
+def test_ingredient_mismatch_is_high_risk_when_live_lookup_unavailable(monkeypatch):
+    def unavailable_lookup(self, registration_number):
+        return GreenbookLookupResult(
+            status="unavailable",
+            record=None,
+            message="Could not reach the NAFDAC Greenbook.",
+        )
+
+    monkeypatch.setattr(
+        main_module.GreenbookClient,
+        "lookup",
+        unavailable_lookup,
+    )
+
+    response = client.post(
+        "/api/v1/verify",
+        json={
+            "claims": {
+                "product_name": "Example Medicine",
+                "active_ingredients": "Paracetamol",
+                "strength": "25 mg",
+                "dosage_form": "Tablet",
+                "nafdac_reg_number": "A4-100160",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # The exact registration number resolves to a curated snapshot record
+    # whose registered active ingredient is Spironolactone.
+    assert data["matched_record"] is True
+    assert data["registry_lookup_status"] == "unavailable"
+    assert data["dataset_label"] == "curated_source_record"
+    assert data["status"] == "high_risk_discrepancy_detected"
+
+    ingredient_check = next(
+        check for check in data["checks"]
+        if check["field"] == "active_ingredients"
+    )
+    assert ingredient_check["outcome"] == "mismatch"
