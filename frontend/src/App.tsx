@@ -727,13 +727,12 @@ function App() {
                 </label>
 
                 <label className="claim-field">
-                  NAFDAC registration number {uncertaintyBadge("nafdac_reg_number")} <span className="required-mark">Required</span>
+                  NAFDAC registration number {uncertaintyBadge("nafdac_reg_number")} <span className="optional-mark">Optional</span>
                   <input
                     name="nafdac_reg_number"
                     value={claims.nafdac_reg_number}
                     onChange={(event) => updateClaim("nafdac_reg_number", event.target.value)}
                     placeholder="e.g. A4-100160"
-                    required
                   />
                 </label>
 

@@ -516,17 +516,13 @@ def classify_alert_batch_expiry(
     return "expired" if expiry < current_date else "not_expired"
 
 
-def find_relevant_alerts(
-    claims: PackageClaims,
-    alert_records: list[dict],
-    today: date | None = None,
-) -> list[SafetyAlertEvidence]:
-    """Find alerts supported by a product-name match plus another identifier."""
+def find_relevant_alerts(claims, alert_records, today=None) -> list[SafetyAlertEvidence]:
+    """Return relevant alert evidence without treating a potential match as proof."""
     relevant_alerts = []
-
     package_name = normalize(claims.product_name)
     package_number = normalize_registration_number(claims.nafdac_reg_number)
-    package_batch = normalize(claims.batch_number)
+    package_batch = normalize_registration_number(claims.batch_number)
+    package_marketer = normalize(getattr(claims, "marketer", None))
 
     if not package_name:
         return relevant_alerts
@@ -536,6 +532,8 @@ def find_relevant_alerts(
         alert_number = normalize_registration_number(
             alert.get("reported_registration_number")
         )
+        alert_marketer = normalize(alert.get("reference_manufacturer"))
+
         raw_batches = alert.get("batch_numbers") or []
         if isinstance(raw_batches, str):
             raw_batches = [raw_batches]
@@ -551,86 +549,125 @@ def find_relevant_alerts(
             for value in reported_batches
             if normalize_registration_number(value)
         }
-        matching_batches = (
-            [
-                value
-                for value in reported_batches
-                if normalize_registration_number(value) == normalize_registration_number(claims.batch_number)
-            ]
-            if claims.batch_number
-            else []
-        )
+
+        matching_batches = [
+            value
+            for value in reported_batches
+            if package_batch
+            and normalize_registration_number(value) == package_batch
+        ]
         batch_matches = bool(matching_batches)
         has_reported_batches = bool(normalized_batches)
 
-        name_matches = (
-            bool(alert_name)
-            and ratio(package_name, alert_name) >= 85
+        name_matches = bool(alert_name) and ratio(package_name, alert_name) >= 85
+        number_matches = bool(package_number and alert_number and package_number == alert_number)
+        marketer_matches = (
+            bool(package_marketer and alert_marketer)
+            and compare_text(
+                "marketer",
+                getattr(claims, "marketer", None),
+                alert.get("reference_manufacturer"),
+            ).outcome == "match"
         )
-        number_matches = (
-            bool(package_number)
-            and bool(alert_number)
-            and package_number == alert_number
+        number_conflicts = bool(
+            package_number and alert_number and package_number != alert_number
         )
-        if name_matches and (number_matches or batch_matches):
-            relevant_alerts.append(
-                SafetyAlertEvidence(
-                    alert_id=alert["alert_id"],
-                    title=alert["title"],
-                    product_name=alert["product_name"],
-                    source_name=alert["source_name"],
-                    source_url=alert["source_url"],
-                    published_at=alert.get("published_at"),
-                    alert_scope=alert.get("alert_scope"),
-                    reported_batch_numbers=reported_batches,
-                    matched_batch_number=(
-                        matching_batches[0] if matching_batches else None
-                    ),
-                    batch_expiry_date=alert.get("expiry_date"),
-                    batch_expiry_status=classify_alert_batch_expiry(
-                        alert.get("expiry_date"),
-                        today=today,
-                    ),
-                    batch_match_status=(
-                        "match"
-                        if batch_matches
-                        else (
-                            "different"
-                            if package_batch and has_reported_batches
-                            else "not_checked"
-                        )
-                    ),
-                    explanation=(
-                        (
-                            "The product name and supplied batch number match "
-                            "one of the batches reported in this safety-alert "
-                            "record. This is evidence "
-                            "requiring review, not proof that the package's "
-                            "contents are affected."
-                        )
-                        if batch_matches
-                        else (
-                            "The product name and registration number match "
-                            "this safety-alert record, but the supplied batch "
-                            "number differs from the reported batch or batches. Review "
-                            "the original notice; this record does not establish "
-                            "that the supplied batch is affected."
-                        )
-                        if number_matches and package_batch and has_reported_batches
-                        else (
-                            "The product name and at least one additional "
-                            "identifier match this safety-alert record, but an "
-                            "exact batch comparison could not be completed. "
-                            "This is evidence requiring review, not proof that "
-                            "this individual package is affected."
-                        )
-                    ),
+
+        # A strong identifier is not required to surface a product-name
+        # candidate, but such a candidate must remain explicitly unconfirmed.
+        if not name_matches:
+            continue
+
+        if not (number_matches or marketer_matches or batch_matches):
+            evidence_scope = "product_potential_match"
+            explanation = (
+                "The product name resembles the product named in this safety-alert "
+                "record, but no exact registration-number, holder/marketer, or batch "
+                "match was established. This is a potential match only. Review the "
+                "original notice; it is not proof that this package is affected."
+            )
+        elif batch_matches:
+            evidence_scope = "batch_specific"
+            explanation = (
+                "The product name and supplied batch number match a batch reported "
+                "in this safety-alert record. This warrants review, but is not proof "
+                "that the package contents are affected."
+            )
+            if number_conflicts:
+                explanation += (
+                    " The registration number reported in the alert differs from "
+                    "the package claim; verify both identifiers against the original "
+                    "notice and registry."
                 )
+        elif number_matches:
+            evidence_scope = "registration_number_specific"
+            if package_batch and has_reported_batches:
+                explanation = (
+                    "The product name and registration number match this alert, "
+                    "but the supplied batch number differs from the reported batch "
+                    "or batches. Review the original notice; this record does not "
+                    "establish that the supplied batch is affected."
+                )
+            else:
+                explanation = (
+                    "The product name and registration number match this alert, "
+                    "but an exact batch comparison could not be completed. This is "
+                    "evidence requiring review, not proof that this individual "
+                    "package is affected."
+                )
+        else:
+            evidence_scope = "holder_and_product"
+            explanation = (
+                "The product name and package Reg. Holder / Marketer match the "
+                "company named in this safety-alert record. An exact registration-"
+                "number or batch match has not been established, so review the "
+                "original notice before drawing conclusions."
+            )
+            if number_conflicts:
+                explanation += (
+                    " The registration number reported in the alert differs from "
+                    "the package claim."
+                )
+
+        if number_conflicts and "differs from the package claim" not in explanation:
+            explanation += (
+                " The registration number reported in the alert differs from "
+                "the package claim; verify both identifiers against the original "
+                "notice and registry."
             )
 
+        matching_batch = matching_batches[0] if matching_batches else None
+        batch_match_status = (
+            "match"
+            if batch_matches
+            else (
+                "different"
+                if package_batch and has_reported_batches
+                else "not_checked"
+            )
+        )
+
+        relevant_alerts.append(
+            SafetyAlertEvidence(
+                alert_id=alert["alert_id"],
+                title=alert["title"],
+                product_name=alert["product_name"],
+                source_name=alert["source_name"],
+                source_url=alert["source_url"],
+                published_at=alert.get("published_at"),
+                alert_scope=evidence_scope,
+                reported_batch_numbers=reported_batches,
+                matched_batch_number=matching_batch,
+                batch_expiry_date=alert.get("expiry_date"),
+                batch_expiry_status=classify_alert_batch_expiry(
+                    alert.get("expiry_date"), today=today
+                ),
+                batch_match_status=batch_match_status,
+                explanation=explanation,
+            )
+        )
+
     return relevant_alerts
-
-
 def _alert_warrants_high_risk(
     safety_alerts: list[SafetyAlertEvidence],
 ) -> bool:

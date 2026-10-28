@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import ssl
+import certifi
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -136,7 +138,11 @@ class GreenbookClient:
         )
 
         try:
-            with urlopen(request, timeout=self.timeout) as response:
+            with urlopen(
+                request,
+                timeout=self.timeout,
+                context=ssl.create_default_context(cafile=certifi.where()),
+            ) as response:
                 if response.status != 200:
                     raise GreenbookUnavailable(
                         f"Greenbook returned HTTP {response.status}."

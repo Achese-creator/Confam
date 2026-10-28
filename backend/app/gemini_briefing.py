@@ -14,8 +14,8 @@ from app.schemas import VerificationResult
 logger = logging.getLogger(__name__)
 
 BRIEFING_PROMPT = """
-Write a concise, plain-language evidence briefing for a medicine-package
-verification result. Use 2?4 sentences and no more than 650 characters.
+Write a clear, plain-language evidence briefing for a medicine-package
+verification result. Prioritize accurate, evidence-grounded explanations over a fixed character limit.
 
 Explain the most important finding first. Mention a printed package expiry
 assessment only if an expiry check is present. Mention registration expiry
@@ -37,7 +37,7 @@ Never describe a lookup as completed when its status is "not_searched" or
 "unavailable". An empty safety_alerts list does not prove that no alerts exist.
 Do not infer an expiry assessment, registry status, alert result, or missing
 value from absence alone. If a lookup was not performed or was unavailable,
-say so only when relevant and within the character limit.
+say so only when relevant.
 
 Use only facts explicitly present in the supplied JSON. Do not invent facts,
 dates, causes, risk levels, or recommendations unsupported by the evidence.
@@ -229,9 +229,8 @@ def generate_evidence_briefing(result: VerificationResult) -> str:
             max_completion_tokens=500,
         )
         briefing = (response.choices[0].message.content or "").strip()
-        if not briefing or len(briefing) > 800:
-            reason = "empty response" if not briefing else "response exceeded 800 characters"
-            logger.warning("Groq returned an unusable evidence briefing (%s).", reason)
+        if not briefing:
+            logger.warning("Groq returned an empty evidence briefing.")
             return fallback
         if briefing_has_unsupported_claims(briefing, result):
             logger.warning(

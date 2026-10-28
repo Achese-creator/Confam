@@ -799,3 +799,73 @@ def test_company_comparison_does_not_match_unrelated_names():
     check = compare_text("marketer", "Fidson", "Emzor Pharmaceuticals")
     assert check.outcome == "mismatch"
 
+
+
+def test_live_alert_product_only_is_potential_evidence():
+    from app.verifier import find_relevant_alerts
+
+    claims = matching_claims().model_copy(update={
+        "nafdac_reg_number": None,
+        "batch_number": None,
+        "marketer": None,
+    })
+    alert = {
+        "alert_id": "TEST-POTENTIAL-ONLY",
+        "title": "Potential product alert",
+        "product_name": "Example Paracetamol",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/potential",
+    }
+
+    matches = find_relevant_alerts(claims, [alert])
+
+    assert len(matches) == 1
+    assert matches[0].alert_scope == "product_potential_match"
+    assert "potential match only" in matches[0].explanation.lower()
+
+
+def test_alert_marketer_match_uses_company_suffix_comparison():
+    from app.verifier import find_relevant_alerts
+
+    claims = matching_claims().model_copy(update={
+        "marketer": "Fidson",
+        "batch_number": None,
+    })
+    alert = {
+        "alert_id": "TEST-HOLDER-MATCH",
+        "title": "Holder comparison alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "OTHER-NRN",
+        "reference_manufacturer": "Fidson Healthcare Plc",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/holder",
+    }
+
+    matches = find_relevant_alerts(claims, [alert])
+
+    assert len(matches) == 1
+    assert matches[0].alert_scope == "holder_and_product"
+    assert "registration number reported in the alert differs" in (
+        matches[0].explanation.lower()
+    )
+
+
+def test_potential_alert_discloses_conflicting_registration_number():
+    from app.verifier import find_relevant_alerts
+
+    claims = matching_claims().model_copy(update={"batch_number": None})
+    alert = {
+        "alert_id": "TEST-NRN-CONFLICT",
+        "title": "Registration conflict alert",
+        "product_name": "Example Paracetamol",
+        "reported_registration_number": "DIFFERENT-NRN",
+        "batch_number": "UNRELATED-BATCH",
+        "source_name": "Test source",
+        "source_url": "https://example.invalid/conflict",
+    }
+
+    matches = find_relevant_alerts(claims, [alert])
+
+    assert len(matches) == 1
+    assert matches[0].alert_scope == "product_potential_match"
+    assert "differs from the package claim" in matches[0].explanation.lower()

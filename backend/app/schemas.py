@@ -81,7 +81,7 @@ class SafetyAlertRecord(BaseModel):
     source_url: str
     published_at: str | None = None
     retrieved_at: str
-    dataset_label: Literal["synthetic_test_fixture", "curated_source_record"]
+    dataset_label: Literal["synthetic_test_fixture", "curated_source_record", "live_source_record"]
     curation_note: str | None = None
 
 

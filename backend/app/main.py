@@ -225,9 +225,7 @@ def verify(request: VerifyRequest):
     live_alert_records = []
     alert_lookup_message = None
 
-    if claims.product_name and (
-        registration_number or (claims.batch_number or "").strip()
-    ):
+    if (claims.product_name or "").strip():
         try:
             alert_lookup = NAFDACSafetyAlertClient().lookup(
                 product_name=claims.product_name,

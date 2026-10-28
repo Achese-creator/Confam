@@ -194,37 +194,81 @@ class NAFDACSafetyAlertClient:
                 notice, text = self._parse_notice(post)
                 notices.append(notice)
 
-                # Only accept notices whose text explicitly includes the
-                # supplied product name and an additional supplied identifier
-                # matching a reported identifier. Broader notices are still
-                # returned as notice metadata but not fed to the matcher.
-                product_in_notice = product_name.casefold() in text.casefold()
+                # Normalize case and whitespace before matching. Product-only
+                # hits are retained as potential evidence, not confirmations.
+                normalized_text = " ".join(text.casefold().split())
+                normalized_product = " ".join(product_name.casefold().split())
+                product_in_notice = bool(normalized_product) and (
+                    normalized_product in normalized_text
+                )
+
                 reported_batches, reported_numbers = self._extract_identifiers(text)
 
+                normalize_id = lambda value: re.sub(
+                    r"[^a-z0-9]", "", (value or "").casefold()
+                )
                 batch_match = bool(
                     batch_number
-                    and any(x.casefold() == batch_number.casefold()
-                            for x in reported_batches)
+                    and any(
+                        normalize_id(value) == normalize_id(batch_number)
+                        for value in reported_batches
+                    )
                 )
                 number_match = bool(
                     registration_number
-                    and any(re.sub(r"[^a-z0-9]", "", x.casefold())
-                            == re.sub(r"[^a-z0-9]", "", registration_number.casefold())
-                            for x in reported_numbers)
+                    and any(
+                        normalize_id(value) == normalize_id(registration_number)
+                        for value in reported_numbers
+                    )
                 )
 
-                if product_in_notice and (batch_match or number_match):
+                # Capture an explicitly labelled holder/applicant when present.
+                holder_match = re.search(
+                    r"\b(?:marketed\s+by|registration\s+holder|"
+                    r"applicant(?:\s+name)?|manufactured\s+by)\s*[:\-]?\s*"
+                    r"([^.;\n]{3,100})",
+                    text,
+                    flags=re.IGNORECASE,
+                )
+                holder_name = (
+                    " ".join(holder_match.group(1).split()).strip(" ,:")
+                    if holder_match else None
+                )
+                marketer_match = bool(
+                    holder_name
+                    and registration_number
+                    and number_match
+                )
+
+                if product_in_notice:
                     records.append({
                         **notice,
                         "product_name": product_name,
                         "reported_registration_number": (
-                            registration_number if number_match else None
+                            next(
+                                (
+                                    value for value in reported_numbers
+                                    if normalize_id(value) == normalize_id(registration_number)
+                                ),
+                                registration_number,
+                            )
+                            if number_match else (
+                                reported_numbers[0] if reported_numbers else None
+                            )
                         ),
+                        "reference_manufacturer": holder_name,
                         "batch_number": None,
-                        "batch_numbers": (
-                            [batch_number] if batch_match else []
+                        "batch_numbers": reported_batches,
+                        "alert_scope": (
+                            "batch_specific" if batch_match else
+                            "registration_number_specific" if number_match else
+                            "product_potential_match"
                         ),
-                        "alert_scope": "batch_specific" if batch_match else "registration_number_specific",
+                        "match_type": (
+                            "batch_and_product" if batch_match else
+                            "registration_and_product" if number_match else
+                            "product_potential"
+                        ),
                         "expiry_date": None,
                     })
 
@@ -235,7 +279,7 @@ class NAFDACSafetyAlertClient:
                 message=(
                     "Live NAFDAC notices were retrieved. Matching records require review."
                     if records else
-                    "Live NAFDAC search completed; no notice met the strict product-and-identifier criteria. This does not establish safety."
+                    "Live NAFDAC search completed; no notice mentioning the supplied product name was found. This does not establish safety."
                 ),
             )
         except (HTTPError, URLError, TimeoutError, OSError, ValueError,
