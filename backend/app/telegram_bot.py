@@ -28,7 +28,8 @@ MAX_MESSAGE_LENGTH = 3900
 API_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
 
 BASE_URL = os.getenv(
-    "CONFAM_API_BASE_URL", "http://127.0.0.1:8000"
+    "CONFAM_API_BASE_URL",
+    f"http://127.0.0.1:{os.getenv('PORT', '8000')}",
 ).rstrip("/")
 
 FIELD_LABELS = {
@@ -622,13 +623,9 @@ async def verify_claims(
         )
 
 
-def main():
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise RuntimeError(
-            "TELEGRAM_BOT_TOKEN is missing from backend/.env."
-        )
 
+def build_application(token: str) -> Application:
+    """Build the bot and register its existing handlers."""
     application = Application.builder().token(token).build()
 
     application.add_handler(CommandHandler("start", start))
@@ -648,11 +645,21 @@ def main():
             receive_image,
         )
     )
+    return application
 
+
+def main():
+    """Run the bot in polling mode for local development."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        raise RuntimeError(
+            "TELEGRAM_BOT_TOKEN is missing from backend/.env."
+        )
+
+    application = build_application(token)
     logger.info("Starting CONFAM Telegram bot; API base URL: %s", BASE_URL)
     application.run_polling()
 
 
 if __name__ == "__main__":
     main()
-

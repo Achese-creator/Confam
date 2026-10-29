@@ -1,8 +1,13 @@
 import json
+import hmac
+import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from telegram import Update
 from pydantic import BaseModel, Field
+
+from app.telegram_bot import build_application
 
 from app.schemas import (
     PackageClaims,
@@ -61,6 +66,86 @@ app = FastAPI(
     ),
     version="0.2.0",
 )
+
+@app.on_event("startup")
+async def start_telegram_webhook():
+    """Start Telegram processing and register the public webhook."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        app.state.telegram_application = None
+        return
+
+    telegram_app = build_application(token)
+    await telegram_app.initialize()
+    await telegram_app.start()
+    app.state.telegram_application = telegram_app
+
+    external_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+    if not external_url:
+        # Local API development can continue without a public webhook.
+        print(
+            "Telegram bot initialized without a webhook: "
+            "RENDER_EXTERNAL_URL is not set."
+        )
+        return
+
+    webhook_url = f"{external_url}/telegram/webhook"
+    secret = os.getenv("TELEGRAM_WEBHOOK_SECRET")
+    if not secret:
+        raise RuntimeError(
+            "TELEGRAM_WEBHOOK_SECRET is required for public webhook delivery."
+        )
+
+    webhook_options = {
+        "url": webhook_url,
+        "secret_token": secret,
+    }
+    await telegram_app.bot.set_webhook(**webhook_options)
+    print(f"Telegram webhook registered at {webhook_url}")
+
+
+@app.on_event("shutdown")
+async def stop_telegram_webhook():
+    """Gracefully stop Telegram update processing."""
+    telegram_app = getattr(app.state, "telegram_application", None)
+    if telegram_app is not None:
+        await telegram_app.stop()
+        await telegram_app.shutdown()
+        app.state.telegram_application = None
+
+
+@app.post("/telegram/webhook")
+async def receive_telegram_webhook(request: Request):
+    """Validate and enqueue a Telegram update."""
+    telegram_app = getattr(app.state, "telegram_application", None)
+    if telegram_app is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Telegram bot is not configured.",
+        )
+
+    secret = os.getenv("TELEGRAM_WEBHOOK_SECRET")
+    if not secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Telegram webhook secret is not configured.",
+        )
+
+    supplied_secret = request.headers.get(
+        "X-Telegram-Bot-Api-Secret-Token", ""
+    )
+    if not hmac.compare_digest(supplied_secret, secret):
+        raise HTTPException(status_code=403, detail="Invalid webhook secret.")
+
+    try:
+        payload = await request.json()
+        update = Update.de_json(payload, telegram_app.bot)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid Telegram update.")
+
+    await telegram_app.update_queue.put(update)
+    return {"ok": True}
+
 
 
 class VerifyRequest(BaseModel):
