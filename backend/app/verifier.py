@@ -45,6 +45,16 @@ def normalize_product_name(
 
     normalized = normalize(value)
 
+    # Remove a complete supplied strength only when it is an exact trailing
+    # suffix and leaves a non-empty product name.
+    normalized_strength = normalize(strength)
+    if (
+        normalized_strength
+        and len(normalized) > len(normalized_strength)
+        and normalized.endswith(normalized_strength)
+    ):
+        normalized = normalized[:-len(normalized_strength)]
+
     # Remove a trailing dosage descriptor, such as "soflets" or "tablet".
     for suffix in sorted(_PRODUCT_FORM_SUFFIXES, key=len, reverse=True):
         if normalized.endswith(suffix) and len(normalized) > len(suffix):
@@ -92,7 +102,7 @@ def normalize_manufacturer(value: str | None) -> str:
     # Example: "Fidson Healthcare Plc" becomes "fidson".
     suffixes = (
         "privatelimited", "pvtltd", "incorporated",
-        "limited", "healthcare", "ltd", "plc", "llc", "inc",
+        "limited", "healthcare", "nigeria", "ltd", "plc", "llc", "inc",
     )
     changed = True
     while changed and normalized:
@@ -559,7 +569,10 @@ def find_relevant_alerts(claims, alert_records, today=None) -> list[SafetyAlertE
         batch_matches = bool(matching_batches)
         has_reported_batches = bool(normalized_batches)
 
-        name_matches = bool(alert_name) and ratio(package_name, alert_name) >= 85
+        name_matches = bool(alert_name) and (
+            ratio(package_name, alert_name) >= 85
+            or package_name.startswith(alert_name)
+        )
         number_matches = bool(package_number and alert_number and package_number == alert_number)
         marketer_matches = (
             bool(package_marketer and alert_marketer)

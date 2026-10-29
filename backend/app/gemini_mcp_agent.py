@@ -1,4 +1,4 @@
-﻿"""Groq function calling through CONFAM's actual MCP server."""
+"""Groq function calling through CONFAM's actual MCP server."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -104,12 +105,25 @@ async def _run_with_session(
         for tool in mcp_tools
     ]
     allowed_names = {tool.name for tool in mcp_tools}
+    safety_lookup_required = bool(
+        re.search(
+            r"\b(?:safety(?:[\s-]+alerts?)?|recalls?|"
+            r"regulatory[\s-]+notices?|alert records?)\b",
+            query,
+            re.IGNORECASE,
+        )
+    ) and "get_relevant_safety_alerts" in allowed_names
 
     if trace is not None:
         trace.setdefault("tools_called", [])
         trace.setdefault("tool_call_count", 0)
         trace.setdefault("tool_errors", 0)
         trace.setdefault("tool_errors_by_name", [])
+
+    # Keep actual returned alert records so the final model answer cannot
+    # contradict evidence supplied by the safety-alert tool.
+    alert_evidence = []
+    alert_lookup_failed = False
 
     messages = [
         {"role": "system", "content": AGENT_INSTRUCTIONS},
@@ -123,17 +137,31 @@ async def _run_with_session(
     )
 
     for round_number in range(max_tool_rounds + 1):
+        request_tools = tools
+        request_tool_choice = "auto"
+        if round_number == 0 and safety_lookup_required:
+            request_tools = [
+                item for item in tools
+                if item["function"]["name"] == "get_relevant_safety_alerts"
+            ]
+            request_tool_choice = "required"
+
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            tools=tools,
-            tool_choice="auto",
+            tools=request_tools,
+            tool_choice=request_tool_choice,
             max_tokens=1200,
             temperature=0,
         )
 
         choices = _message_value(response, "choices", []) or []
         if not choices:
+            logger.warning(
+                "ASK_DIAGNOSTIC_CHOICES_EMPTY model=%s response_id=%s",
+                model,
+                _message_value(response, "id", "unknown"),
+            )
             return (
                 "The evidence assistant could not produce a usable response. "
                 "Please review the registry and alert evidence directly."
@@ -141,6 +169,11 @@ async def _run_with_session(
 
         message = _message_value(choices[0], "message")
         if message is None:
+            logger.warning(
+                "ASK_DIAGNOSTIC_MESSAGE_EMPTY model=%s finish_reason=%s",
+                model,
+                _message_value(choices[0], "finish_reason", "unknown"),
+            )
             return (
                 "The evidence assistant could not produce a usable response. "
                 "Please review the registry and alert evidence directly."
@@ -149,18 +182,152 @@ async def _run_with_session(
         tool_calls = _message_value(message, "tool_calls", []) or []
         if not tool_calls:
             answer = _message_value(message, "content", None)
+            if alert_lookup_failed and not alert_evidence:
+                return " ".join([
+                    "The safety-alert lookup could not be completed.",
+                    "No conclusion can be drawn about whether relevant alerts exist.",
+                    "Review published NAFDAC notices directly; this limitation",
+                    "does not establish that the medicine is safe, unsafe, or counterfeit.",
+                ])
             if isinstance(answer, str) and answer.strip():
+                if alert_evidence:
+                    lines = [
+                        "The safety-alert lookup returned "
+                        f"{len(alert_evidence)} alert record(s):"
+                    ]
+                    for record in alert_evidence[:5]:
+                        title = (
+                            record.get("title")
+                            or record.get("alert_title")
+                            or record.get("product_name")
+                            or "Safety-alert notice"
+                        )
+                        source = record.get("source_name") or "NAFDAC safety-alert evidence"
+                        url = record.get("source_url") or record.get("url")
+                        lines.append(f"- {title} (source: {source})")
+                        if isinstance(url, str) and url.startswith("https://"):
+                            lines.append(f"  Source URL: {url}")
+                    lines.append(
+                        "These records warrant review. Their presence alone "
+                        "does not establish that the supplied package or batch "
+                        "is affected; compare the notice details with the "
+                        "product, registration number, and batch."
+                    )
+                    return "\n".join(lines)
                 return answer.strip()
+            logger.warning(
+                "ASK_DIAGNOSTIC_EMPTY_CONTENT model=%s finish_reason=%s "
+                "tool_calls=%s content_type=%s round=%s",
+                model,
+                _message_value(choices[0], "finish_reason", "unknown"),
+                len(tool_calls),
+                type(answer).__name__ if answer is not None else "None",
+                round_number,
+            )
             return (
                 "The evidence assistant could not produce a usable response. "
                 "Please review the registry and alert evidence directly."
             )
 
         if round_number >= max_tool_rounds:
+            logger.warning(
+                "ASK_LIMIT_SYNTHESIS_ATTEMPT model=%s rounds=%s "
+                "collected_alert_records=%s",
+                model,
+                max_tool_rounds,
+                len(alert_evidence),
+            )
+
+            # Give the model one final opportunity to synthesize evidence
+            # already returned by tools, without allowing further tool calls.
+            final_messages = messages + [{
+                "role": "user",
+                "content": (
+                    "You have reached the tool-call limit. Do not request "
+                    "or call any more tools. Give the best concise answer "
+                    "supported by the evidence already present in this "
+                    "conversation. Separate confirmed findings from unknowns. "
+                    "Do not infer authenticity or safety from missing evidence. "
+                    "If the available evidence is insufficient, say so."
+                ),
+            }]
+
+            try:
+                final_response = client.chat.completions.create(
+                    model=model,
+                    messages=final_messages,
+                    max_tokens=1200,
+                    temperature=0,
+                )
+                final_choices = (
+                    _message_value(final_response, "choices", []) or []
+                )
+                if final_choices:
+                    final_message = _message_value(
+                        final_choices[0], "message"
+                    )
+                    final_answer = (
+                        _message_value(final_message, "content", None)
+                        if final_message is not None
+                        else None
+                    )
+                    if (
+                        isinstance(final_answer, str)
+                        and final_answer.strip()
+                        and not alert_evidence
+                    ):
+                        return final_answer.strip()
+            except Exception as exc:
+                logger.warning(
+                    "ASK_LIMIT_SYNTHESIS_FAILED error_type=%s",
+                    type(exc).__name__,
+                )
+
+            # If synthesis fails, report only safety-alert records actually
+            # collected. Never invent registry or alert findings.
+            if alert_evidence:
+                lines = [
+                    "The safety-alert lookup returned "
+                    f"{len(alert_evidence)} alert record(s):"
+                ]
+                for record in alert_evidence[:5]:
+                    title = (
+                        record.get("title")
+                        or record.get("alert_title")
+                        or record.get("product_name")
+                        or "Safety-alert notice"
+                    )
+                    source_name = (
+                        record.get("source_name")
+                        or "NAFDAC safety-alert evidence"
+                    )
+                    url = record.get("source_url") or record.get("url")
+                    lines.append(f"- {title} (source: {source_name})")
+                    if isinstance(url, str) and url.startswith("https://"):
+                        lines.append(f"  Source URL: {url}")
+
+                lines.extend([
+                    "",
+                    "This partial result does not establish whether the "
+                    "specific package is authentic or safe.",
+                    "The agent could not complete the full evidence review. "
+                    "Check registry details and relevant alerts directly.",
+                ])
+                return "\n".join(lines)
+
+            if alert_lookup_failed:
+                return " ".join([
+                    "The safety-alert lookup could not be completed.",
+                    "No conclusion can be drawn about whether relevant alerts exist.",
+                    "Review published NAFDAC notices directly; this limitation",
+                    "does not establish that the medicine is safe, unsafe, or counterfeit.",
+                ])
             return (
-                "The evidence assistant reached its tool-call limit before "
-                "producing a final explanation. Review the available registry "
-                "and safety-alert evidence directly."
+                "The evidence assistant reached its tool-call limit and "
+                "could not complete its full review. No final conclusion "
+                "can be drawn from this incomplete run. Check the available "
+                "registry and safety-alert evidence directly; this limitation "
+                "does not mean the product is counterfeit or safe."
             )
 
         # Preserve the assistant's requested calls in the conversation.
@@ -216,6 +383,21 @@ async def _run_with_session(
                 try:
                     result = await session.call_tool(name, arguments)
                     payload = _tool_result_payload(result)
+                    if name == "get_relevant_safety_alerts":
+                        for item in payload.get("content", []):
+                            if not isinstance(item, dict):
+                                continue
+                            # Prefer the explicitly separated source arrays;
+                            # use "alerts" only for older tool payloads.
+                            records = item.get("live_alerts") or []
+                            records += item.get("curated_alerts") or []
+                            if not records:
+                                records = item.get("alerts") or []
+                            for record in records:
+                                if not isinstance(record, dict):
+                                    continue
+                                if record not in alert_evidence:
+                                    alert_evidence.append(record)
                 except Exception as exc:
                     logger.warning(
                         "MCP tool call failed for %s (%s).",
@@ -229,6 +411,12 @@ async def _run_with_session(
                             "Do not infer a negative finding from this error."
                         ),
                     }
+
+            if (
+                name == "get_relevant_safety_alerts"
+                and payload.get("tool_error")
+            ):
+                alert_lookup_failed = True
 
             if trace is not None and payload.get("tool_error"):
                 trace["tool_errors"] += 1
@@ -278,7 +466,7 @@ async def _run_agent(
                     trace=trace,
                 )
     except Exception as exc:
-        logger.warning(
+        logger.exception(
             "Groq-MCP agent failed (%s).",
             type(exc).__name__,
         )

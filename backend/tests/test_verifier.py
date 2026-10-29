@@ -793,6 +793,29 @@ def test_marketer_comparison_ignores_common_company_suffixes():
     assert check.outcome == "match"
 
 
+def test_marketer_comparison_ignores_nigeria_company_suffix():
+    from app.verifier import compare_text
+
+    check = compare_text(
+        "marketer",
+        "Ranbaxy",
+        "Ranbaxy Nigeria Limited",
+    )
+    assert check.outcome == "match"
+
+
+def test_product_name_comparison_strips_complete_supplied_strength():
+    from app.verifier import compare_product_name
+
+    check = compare_product_name(
+        "Sporidex",
+        "Sporidex Suspension 125 mg/5 mL",
+        "125 mg/5 mL",
+        "125 mg/5 mL",
+    )
+    assert check.outcome == "match"
+
+
 def test_company_comparison_does_not_match_unrelated_names():
     from app.verifier import compare_text
 

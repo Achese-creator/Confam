@@ -228,7 +228,14 @@ def generate_evidence_briefing(result: VerificationResult) -> str:
             temperature=0,
             max_completion_tokens=500,
         )
-        briefing = (response.choices[0].message.content or "").strip()
+        choice = response.choices[0]
+        if getattr(choice, "finish_reason", None) == "length":
+            logger.warning(
+                "Groq evidence briefing was truncated; using deterministic fallback."
+            )
+            return fallback
+
+        briefing = (choice.message.content or "").strip()
         if not briefing:
             logger.warning("Groq returned an empty evidence briefing.")
             return fallback

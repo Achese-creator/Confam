@@ -58,6 +58,37 @@ def test_alert_tool_reports_no_matches_without_claiming_safety():
     assert "does not establish safety" in result["interpretation"]
 
 
+def test_live_only_alert_sets_overall_match_status():
+    live_record = {
+        "title": "Example NAFDAC alert",
+        "url": "https://nafdac.gov.ng/example-alert",
+    }
+    live_result = type(
+        "LiveResult",
+        (),
+        {
+            "status": "matches_found",
+            "records": [live_record],
+            "message": "One live notice matched.",
+        },
+    )()
+
+    with (
+        patch.object(mcp_server, "find_relevant_alerts", return_value=[]),
+        patch.object(mcp_server, "NAFDACSafetyAlertClient") as client_class,
+    ):
+        client_class.return_value.lookup.return_value = live_result
+        result = mcp_server.get_relevant_safety_alerts(
+            product_name="Example medicine",
+        )
+
+    assert result["status"] == "matches_found"
+    assert result["live_status"] == "matches_found"
+    assert result["live_alert_count"] == 1
+    assert result["curated_status"] == "no_matches_found"
+    assert result["curated_alert_count"] == 0
+
+
 def test_alert_tool_returns_serialized_evidence():
     fake_alert = type(
         "FakeAlert",

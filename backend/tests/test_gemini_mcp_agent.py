@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -157,6 +157,182 @@ def test_groq_tool_call_uses_mcp_and_records_trace():
     )
 
 
+
+def test_safety_question_forces_alert_lookup_before_other_tools():
+    record = {
+        "title": (
+            "Alert on the Voluntary Recall of Sporidex Suspension "
+            "125 mg/5 mL, Batch No. DFG4606A"
+        ),
+        "source_name": "NAFDAC",
+        "source_url": "https://nafdac.gov.ng/example-sporidex-alert",
+        "product_name": "Sporidex Suspension",
+        "reported_batch_numbers": ["DFG4606A"],
+    }
+    session = make_session(
+        tools=[
+            tool("search_greenbook_by_nrn"),
+            tool("get_relevant_safety_alerts"),
+        ],
+        result=SimpleNamespace(
+            isError=False,
+            content=[SimpleNamespace(text=json.dumps({
+                "status": "matches_found",
+                "curated_alerts": [record],
+                "live_alerts": [],
+                "alerts": [record],
+            }))],
+        ),
+    )
+    client = make_client(
+        assistant_tool_call(
+            arguments=(
+                '{"product_name":"Sporidex Suspension 125 mg/5 mL",'
+                '"nafdac_reg_number":"04-1356",'
+                '"batch_number":"DFG4606A"}'
+            ),
+        ),
+        assistant_text("No safety alerts were found."),
+    )
+    query = (
+        "Check safety alerts or regulatory notices for Sporidex Suspension "
+        "125 mg/5 mL, NRN 04-1356, batch DFG4606A."
+    )
+
+    answer = asyncio.run(
+        _run_with_session(session, client, query)
+    )
+
+    first_call = client.chat.completions.create.call_args_list[0].kwargs
+    assert first_call["tool_choice"] == "required"
+    assert [
+        item["function"]["name"] for item in first_call["tools"]
+    ] == ["get_relevant_safety_alerts"]
+    session.call_tool.assert_awaited_once()
+    assert "DFG4606A" in answer
+    assert record["source_url"] in answer
+    assert "No safety alerts were found" not in answer
+
+
+def test_failed_safety_lookup_cannot_be_reported_as_no_alerts():
+    session = make_session(
+        tools=[tool()],
+        result=SimpleNamespace(isError=True, content=[]),
+    )
+    client = make_client(
+        assistant_tool_call(),
+        assistant_text("No safety alerts were found."),
+    )
+
+    answer = asyncio.run(
+        _run_with_session(
+            session, client, "Check safety alerts for Example medicine"
+        )
+    )
+
+    assert "lookup could not be completed" in answer.lower()
+    assert "no conclusion can be drawn" in answer.lower()
+    assert "No safety alerts were found" not in answer
+
+
+def test_alert_records_override_contradictory_final_answer():
+    record = {
+        "title": "Sporidex suspension safety notice",
+        "source_name": "NAFDAC",
+        "source_url": "https://nafdac.gov.ng/example-alert",
+        "product_name": "Sporidex Suspension",
+    }
+    tool_payload = {
+        "status": "matches_found",
+        "live_status": "matches_found",
+        "live_alerts": [record],
+        "live_alert_count": 1,
+        "curated_status": "no_matches_found",
+        "curated_alerts": [],
+        "alerts": [],
+    }
+    session = make_session(
+        [tool()],
+        SimpleNamespace(
+            isError=False,
+            content=[SimpleNamespace(text=json.dumps(tool_payload))],
+        ),
+    )
+    client = make_client(
+        assistant_tool_call(),
+        assistant_text("No safety alerts were found for this product."),
+    )
+
+    answer = asyncio.run(
+        _run_with_session(session, client, "Check safety alerts for Sporidex")
+    )
+
+    assert "Sporidex suspension safety notice" in answer
+    assert "https://nafdac.gov.ng/example-alert" in answer
+    assert "does not establish that the supplied package or batch is affected" in answer
+    assert "No safety alerts were found" not in answer
+
+
+def test_tool_limit_cannot_override_collected_alerts():
+    record = {
+        "title": (
+            "Alert on the Voluntary Recall of Sporidex Suspension "
+            "125 mg/5 mL, Batch No. DFG4606A"
+        ),
+        "source_name": "NAFDAC",
+        "source_url": (
+            "https://nafdac.gov.ng/public-alert-no-033-2026-alert-on-the-"
+            "voluntary-recall-of-sporidex-suspension-125-mg-5-ml-batch-no-dfg4606a/"
+        ),
+        "product_name": "Sporidex Suspension",
+        "reported_batch_numbers": ["DFG4606A"],
+    }
+
+    session = make_session(
+        tools=[tool()],
+        result=SimpleNamespace(
+            isError=False,
+            content=[
+                SimpleNamespace(
+                    text=json.dumps({
+                        "curated_alerts": [record],
+                        "live_alerts": [],
+                        "alerts": [record],
+                    })
+                )
+            ],
+        ),
+    )
+
+    client = make_client(
+        assistant_tool_call(),
+        assistant_tool_call(
+            arguments='{"product_name":"Sporidex Suspension","batch_number":"DFG4606A"}',
+            call_id="call-2",
+        ),
+        assistant_text("No safety alerts were found for this product."),
+    )
+
+    answer = asyncio.run(
+        _run_with_session(
+            query=(
+                "Check Sporidex Suspension batch DFG4606A "
+                "for NAFDAC safety alerts."
+            ),
+            session=session,
+            client=client,
+            max_tool_rounds=1,
+        )
+    )
+
+    assert "Sporidex Suspension" in answer
+    assert "DFG4606A" in answer
+    assert record["source_url"] in answer
+    assert "No safety alerts were found" not in answer
+    assert "does not establish whether the specific package is authentic or safe" in answer
+    assert session.call_tool.await_count == 1
+
+
 def test_tool_call_loop_is_bounded():
     session = make_session(
         [tool("search_greenbook_by_nrn")]
@@ -178,7 +354,7 @@ def test_tool_call_loop_is_bounded():
         )
     )
     assert "tool-call limit" in answer.lower()
-    assert client.chat.completions.create.call_count == 2
+    assert client.chat.completions.create.call_count == 3
     assert session.call_tool.await_count == 1
 
 
@@ -214,7 +390,8 @@ def test_mcp_exception_is_traced():
     )
     assert trace["tool_errors"] == 1
     assert trace["tool_errors_by_name"] == ["get_relevant_safety_alerts"]
-    assert "unknown" in answer.lower()
+    assert "lookup could not be completed" in answer.lower()
+    assert "no conclusion can be drawn" in answer.lower()
 
 
 def test_unregistered_tool_is_rejected_and_traced():

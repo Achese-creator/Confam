@@ -1112,7 +1112,7 @@ function App() {
             <p className="page-intro">
               Ask a question about medicine registration records or published
               safety alerts. When useful, CONFAM can call its read-only evidence
-              tools and show which tools it invoked.
+              tools to explain relevant findings and their limitations.
             </p>
 
             <form className="assistant-form" onSubmit={submitAgentQuestion}>

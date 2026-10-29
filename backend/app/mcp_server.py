@@ -102,7 +102,11 @@ def get_relevant_safety_alerts(
         "live_message": live_message,
         "live_alert_count": len(live_records),
         "live_alerts": live_records,
-        "status": "matches_found" if curated_records else "no_matches_found",
+        "status": (
+            "matches_found"
+            if live_records or curated_records
+            else "no_matches_found"
+        ),
         "curated_status": "matches_found" if curated_records else "no_matches_found",
         "alert_count": len(curated_records),
         "curated_alert_count": len(curated_records),

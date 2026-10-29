@@ -192,6 +192,45 @@ def test_groq_unsupported_briefing_uses_deterministic_fallback(monkeypatch):
     assert "safety-alert lookup was not performed" in briefing
 
 
+def test_groq_truncated_briefing_uses_deterministic_fallback(monkeypatch):
+    from types import SimpleNamespace
+    import groq
+    from app.gemini_briefing import (
+        deterministic_briefing,
+        generate_evidence_briefing,
+    )
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        finish_reason="length",
+                        message=SimpleNamespace(
+                            content="The registration is set to expire on"
+                        ),
+                    )
+                ]
+            )
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.chat = FakeChat()
+
+    monkeypatch.setattr(groq, "Groq", FakeClient)
+    result = make_result()
+    briefing = generate_evidence_briefing(result)
+
+    assert briefing == deterministic_briefing(result)
+    assert "expire on" not in briefing
+
+
 def test_groq_supported_briefing_is_accepted(monkeypatch):
     from types import SimpleNamespace
     import groq
