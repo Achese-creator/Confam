@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import ssl
 import certifi
 import re
@@ -108,6 +109,37 @@ def _row_to_record(row: dict, retrieved_at: str) -> dict:
     }
 
 
+
+def _greenbook_ssl_context(base_url: str) -> ssl.SSLContext:
+    """Use normal TLS verification unless the demo-only override is enabled."""
+    from urllib.parse import urlparse
+
+    allow_insecure = (
+        os.getenv("GREENBOOK_ALLOW_INSECURE_TLS", "").strip().lower()
+        == "true"
+    )
+
+    if not allow_insecure:
+        return ssl.create_default_context(cafile=certifi.where())
+
+    parsed = urlparse(base_url)
+    if parsed.scheme != "https" or parsed.hostname != "greenbook.nafdac.gov.ng":
+        raise GreenbookUnavailable(
+            "Insecure TLS mode is restricted to the HTTPS NAFDAC Greenbook host."
+        )
+
+    import logging
+    logging.getLogger(__name__).warning(
+        "DEMO SECURITY WARNING: TLS certificate verification is disabled "
+        "for the NAFDAC Greenbook connection."
+    )
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    return context
+
+
 class GreenbookClient:
     """Search Greenbook and confirm exact NRN matches from live results."""
 
@@ -141,7 +173,7 @@ class GreenbookClient:
             with urlopen(
                 request,
                 timeout=self.timeout,
-                context=ssl.create_default_context(cafile=certifi.where()),
+                context=_greenbook_ssl_context(self.base_url),
             ) as response:
                 if response.status != 200:
                     raise GreenbookUnavailable(
